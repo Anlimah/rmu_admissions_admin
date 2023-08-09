@@ -644,7 +644,7 @@ class AdminController
         $message .= "<li>Don't let anyone see your login password</li>";
         $message .= "<li>Access the portal and change your password</li>";
         $message .= "</ol></br>";
-        $message .= "<p><a href='https://office.rmuictonline.com'>Click here to access portal</a>.</p>";
+        $message .= "<p><a href='https://test.office.rmuictonline.com'>Click here to access portal</a>.</p>";
 
         // Send email
         $emailed = $this->expose->sendEmail($user_data["user_name"], $subject, $message);
