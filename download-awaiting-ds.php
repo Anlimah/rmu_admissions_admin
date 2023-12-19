@@ -37,7 +37,8 @@ class Broadsheet
 
             $zip = new ZipArchive();
             $zipFileName = $this->admission_data[0]["info"]; // The name of the zip file you want to create
-
+            echo "<script>alert('" . $this->admission_data[0]["info"] . "')</script>";
+            exit();
             if ($zip->open($zipFileName, ZipArchive::CREATE) === TRUE) {
 
                 foreach ($this->dataSheet["awaitingAppsGrp"] as $grp) {
@@ -76,7 +77,7 @@ class Broadsheet
                     }
 
                     // Save spreadsheet file
-                    $filepath = "awaiting_results/" . $fileName . '.xlsx';
+                    $filepath = "awaiting_results/" . $fileName . '.xls';
                     if (file_exists($filepath)) unlink($filepath);
                     $writer->save($filepath);
                     $spreadsheet->disconnectWorksheets();
