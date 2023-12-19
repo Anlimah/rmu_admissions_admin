@@ -2,17 +2,16 @@
 session_start();
 
 if (!isset($_GET['exttrid']) || empty($_GET['exttrid'])) header('Location: index.php?msg=Invalid request');
-
-if (isset($_SESSION["adminLogSuccess"]) && $_SESSION["adminLogSuccess"] == true && isset($_SESSION["user"]) && !empty($_SESSION["user"])) {
-} else {
+if (!isset($_SESSION["adminLogSuccess"]) || $_SESSION["adminLogSuccess"] == false || !isset($_SESSION["user"]) || empty($_SESSION["user"])) {
     header("Location: ../index.php");
 }
 
-if (isset($_SESSION["vendor_id"]) && !empty($_SESSION["vendor_id"]))
-    $trans_id = $_GET["exttrid"];
-else header("Location: index.php");
+if (!isset($_SESSION["vendor_id"]) || empty($_SESSION["vendor_id"])) header("Location: index.php?msg=Access denied!");
 
-if (isset($_GET['logout']) || strtolower($_SESSION["role"]) != "vendors") {
+$isUser = false;
+if (strtolower($_SESSION["role"]) == "vendors" || strtolower($_SESSION["role"]) == "developers") $isUser = true;
+
+if (isset($_GET['logout']) || !$isUser) {
     session_destroy();
     $_SESSION = array();
     if (ini_get("session.use_cookies")) {

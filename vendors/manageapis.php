@@ -1,12 +1,15 @@
 <?php
 session_start();
-//echo $_SERVER["HTTP_USER_AGENT"];
-if (isset($_SESSION["adminLogSuccess"]) && $_SESSION["adminLogSuccess"] == true && isset($_SESSION["user"]) && !empty($_SESSION["user"])) {
-} else {
-    header("Location: index.php");
-}
 
-if (isset($_GET['logout']) || !isset($_SESSION["api_user"]) || strtolower($_SESSION["role"]) != "vendors") {
+if (!isset($_SESSION["adminLogSuccess"]) || $_SESSION["adminLogSuccess"] == false || !isset($_SESSION["user"]) || empty($_SESSION["user"])) {
+    header("Location: ../index.php");
+}
+if (!isset($_SESSION["api_user"])) header("Location: index.php");
+
+$isUser = false;
+if (strtolower($_SESSION["role"]) == "vendors" || strtolower($_SESSION["role"]) == "developers") $isUser = true;
+
+if (isset($_GET['logout']) || !$isUser) {
     session_destroy();
     $_SESSION = array();
     if (ini_get("session.use_cookies")) {

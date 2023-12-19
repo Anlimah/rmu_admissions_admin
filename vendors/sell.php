@@ -1,22 +1,15 @@
 <?php
 session_start();
-//echo $_SERVER["HTTP_USER_AGENT"];
-if (isset($_SESSION["adminLogSuccess"]) && $_SESSION["adminLogSuccess"] == true && isset($_SESSION["user"]) && !empty($_SESSION["user"])) {
-} else {
-    header("Location: index.php");
-}
 
-if (isset($_SESSION['vendor_id']) && !empty($_SESSION['vendor_id'])) {
-    if (!isset($_SESSION["_vendor1Token"])) {
-        $rstrong = true;
-        $_SESSION["_vendor1Token"] = hash('sha256', bin2hex(openssl_random_pseudo_bytes(64, $rstrong)));
-        $_SESSION["vendor_type"] = "VENDOR";
-    }
-} else {
-    header('Location: index.php');
+if (!isset($_SESSION["adminLogSuccess"]) || $_SESSION["adminLogSuccess"] == false || !isset($_SESSION["user"]) || empty($_SESSION["user"])) {
+    header("Location: ../index.php");
 }
+if (!isset($_SESSION["vendor_id"]) || empty($_SESSION["vendor_id"])) header("Location: index.php?msg=Access denied!");
 
-if (isset($_GET['logout']) || strtolower($_SESSION["role"]) != "vendors") {
+$isUser = false;
+if (strtolower($_SESSION["role"]) == "vendors" || strtolower($_SESSION["role"]) == "developers") $isUser = true;
+
+if (isset($_GET['logout']) || !$isUser) {
     session_destroy();
     $_SESSION = array();
     if (ini_get("session.use_cookies")) {
@@ -33,6 +26,12 @@ if (isset($_GET['logout']) || strtolower($_SESSION["role"]) != "vendors") {
     }
 
     header('Location: ../index.php');
+}
+
+if (!isset($_SESSION["_vendor1Token"])) {
+    $rstrong = true;
+    $_SESSION["_vendor1Token"] = hash('sha256', bin2hex(openssl_random_pseudo_bytes(64, $rstrong)));
+    $_SESSION["vendor_type"] = "VENDOR";
 }
 
 $_SESSION["lastAccessed"] = time();
