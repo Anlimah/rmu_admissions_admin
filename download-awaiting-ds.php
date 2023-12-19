@@ -47,7 +47,8 @@ class Broadsheet
                     $fileName = "{$sanitizedFileName} - {$zipFileName}";
                     $spreadsheet = new Spreadsheet();
                     $sheet = $spreadsheet->getActiveSheet();
-                    $writer = new Xlsx($spreadsheet);
+                    //$writer = new Xlsx($spreadsheet);
+                    $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xls($spreadsheet);
 
                     //$this->formatSpreadsheet();
                     $sheet->setCellValue('A1', "AdmissionNumber");
