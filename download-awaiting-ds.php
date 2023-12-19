@@ -37,8 +37,6 @@ class Broadsheet
 
             $zip = new ZipArchive();
             $zipFileName = $this->admission_data[0]["info"]; // The name of the zip file you want to create
-            echo "<script>alert('" . $this->admission_data[0]["info"] . "')</script>";
-            exit();
             if ($zip->open($zipFileName, ZipArchive::CREATE) === TRUE) {
 
                 foreach ($this->dataSheet["awaitingAppsGrp"] as $grp) {
@@ -48,6 +46,8 @@ class Broadsheet
 
                     //$dateData = $this->admin->getAcademicPeriod($this->admin_period);
                     $fileName = "{$sanitizedFileName} - {$zipFileName}";
+                    echo "<script>alert('" . $fileName . "')</script>";
+                    exit();
 
                     $spreadsheet = new Spreadsheet();
                     $sheet = $spreadsheet->getActiveSheet();
