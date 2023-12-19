@@ -72,6 +72,7 @@ class Broadsheet
                             $sheet->setCellValue("B" . $row, $appData["IndexNumber"]);
                             $sheet->setCellValue("C" . $row, $appData["ExamMonth"]);
                             $sheet->setCellValue("D" . $row, $appData["ExamYear"]);
+                            $sheet->getStyle("A" . $row . ":D" . $row)->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
                             $row += 1;
                         }
                     }
