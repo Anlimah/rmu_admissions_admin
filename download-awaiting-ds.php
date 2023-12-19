@@ -46,8 +46,8 @@ class Broadsheet
                     $sanitizedFileName = preg_replace('/[^A-Za-z0-9_. -]/', '', $sanitizedFileName);
                     $sanitizedFileName = trim($sanitizedFileName);
 
-                    $dateData = $this->admin->getAcademicPeriod($this->admin_period);
-                    $fileName = "{$sanitizedFileName} - Awaiting Results Applicants ({$dateData[0]["start_year"]} - {$dateData[0]["end_year"]})";
+                    //$dateData = $this->admin->getAcademicPeriod($this->admin_period);
+                    $fileName = "{$sanitizedFileName} - {$zipFileName}";
 
                     $spreadsheet = new Spreadsheet();
                     $sheet = $spreadsheet->getActiveSheet();
