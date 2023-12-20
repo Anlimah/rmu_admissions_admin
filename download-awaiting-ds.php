@@ -67,7 +67,7 @@ class Broadsheet
                         if ($grp["Program"] == $appData["Program"]) {
                             $sheet->setCellValue("A" . $row, $appData["AdmissionNumber"]);
                             $sheet->setCellValue("B" . $row, $appData["IndexNumber"]);
-                            $sheet->setCellValue("C" . $row, $appData["ExamMonth"]);
+                            $sheet->setCellValue("C" . $row, in_array($appData["ExamMonth"], ["May", "Jun", "Jul", "Aug", "Sep"]) ? 6 : 12);
                             $sheet->setCellValue("D" . $row, $appData["ExamYear"]);
                             $sheet->getStyle("A" . $row . ":D" . $row)->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
                             $row += 1;
@@ -82,7 +82,6 @@ class Broadsheet
 
                     // Add files to the zip archive
                     $zip->addFile($filepath);
-
                     $count += 1;
                 }
             } else {
