@@ -600,7 +600,7 @@ $admin->updateApplicationStatus($_GET["q"], 'reviewed', 1);
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             window.print();
-            window.close();
+            //window.close();
         });
     </script>
 </body>
