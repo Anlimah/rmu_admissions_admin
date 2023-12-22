@@ -167,7 +167,9 @@ if (isset($_GET["w"]) && $_GET["w"] == 'pdfFileDownload') $result = $admin->exec
         </table>
     </div>
     <script>
-        window.print();
-        window.close();
+        document.addEventListener("DOMContentLoaded", () => {
+            window.print();
+            window.close();
+        });
     </script>
 </body>
