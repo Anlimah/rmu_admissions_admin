@@ -1252,16 +1252,16 @@ class AdminController
         return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
     }
 
-    public function fetchTotalAwaitingResults($admin_period)
+    public function fetchTotalAwaitingResults()
     {
         $query = "SELECT COUNT(pd.id) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, 
+                FROM purchase_detail AS pd, form_sections_chek AS fc, 
                 applicants_login AS al, forms AS ft, academic_background AS ab 
-                WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND 
+                WHERE fc.app_login = al.id AND 
                 al.purchase_id = pd.id AND ab.app_login = al.id AND pd.form_id = ft.id AND fc.`declaration` = 1 AND 
                 ab.`awaiting_result` = 1 AND ab.cert_type = 'WASSCE' AND ab.country = 'GHANA' AND 
                 pd.id NOT IN (SELECT admission_number FROM downloaded_awaiting_results)";
-        return $this->dm->getData($query, array(":ai" => $admin_period));
+        return $this->dm->getData($query);
     }
 
     public function getAllAdmittedApplicantsAllAll($cert_type)

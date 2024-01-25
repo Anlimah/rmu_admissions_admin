@@ -156,7 +156,7 @@ $adminSetup = true;
                                                 <img src="../assets/img/icons8-queue-64.png" style="width: 48px;" alt="">
                                             </div>
                                             <div class="ps-3">
-                                                <h6><?= $admin->fetchTotalAwaitingResults($_SESSION["admin_period"])[0]["total"]; ?></h6>
+                                                <h6><?= $admin->fetchTotalAwaitingResults()[0]["total"]; ?></h6>
                                                 <span class="text-muted small pt-2 ps-1"> applications</span>
                                             </div>
                                         </div>
