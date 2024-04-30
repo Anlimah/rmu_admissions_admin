@@ -33,7 +33,9 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
 ?>
@@ -93,6 +95,25 @@ require_once('../inc/page-data.php');
                                 <div class="card info-card sales-card">
                                     <div class="card-body">
                                         <h5 class="card-title">Admissions</h5>
+                                        <div class="d-flex align-items-center">
+                                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                                <img src="../assets/img/icons8-properties-script-96.png" style="width: 48px;" alt="">
+                                            </div>
+                                            <div class="ps-3">
+                                                <span class="text-muted small pt-2 ps-1">Admissions Dashboard</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div><!-- End Applications Card -->
+
+                        <!-- Applications Card -->
+                        <div class="col-xxl-3 col-md-3">
+                            <a href="../students/">
+                                <div class="card info-card sales-card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Student Mgt</h5>
                                         <div class="d-flex align-items-center">
                                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                                 <img src="../assets/img/icons8-properties-script-96.png" style="width: 48px;" alt="">

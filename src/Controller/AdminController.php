@@ -2,27 +2,31 @@
 
 namespace Src\Controller;
 
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\Settings;
 use Src\System\DatabaseMethods;
 use Src\Controller\ExposeDataController;
 use Src\Controller\PaymentController;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpWord\TemplateProcessor;
 
 class AdminController
 {
     private $dm = null;
     private $expose = null;
+    private $pay = null;
 
-    public function __construct()
+    public function __construct($db, $user, $pass)
     {
-        $this->dm = new DatabaseMethods();
-        $this->expose = new ExposeDataController();
+        $this->dm = new DatabaseMethods($db, $user, $pass);
+        $this->expose = new ExposeDataController($db, $user, $pass);
+        $this->pay = new PaymentController($db, $user, $pass);
     }
 
     public function processVendorPay($data)
     {
-        $payConfirm = new PaymentController();
-        return $payConfirm->vendorPaymentProcess($data);
+        return $this->pay->vendorPaymentProcess($data);
     }
 
     public function fetchVendorUsernameByUserID(int $user_id)
@@ -36,7 +40,7 @@ class AdminController
         // Hash password
         $hashed_pw = password_hash($password, PASSWORD_DEFAULT);
         $query = "UPDATE sys_users SET `password` = :pw WHERE id = :id";
-        $query_result = $this->dm->inputData($query, array(":id" => $user_id, ":pw" => $hashed_pw));
+        $query_result = $this->dm->getData($query, array(":id" => $user_id, ":pw" => $hashed_pw));
 
         if ($query_result) {
             $this->logActivity(
@@ -63,7 +67,7 @@ class AdminController
 
     public function getAcademicPeriod($admin_period)
     {
-        $query = "SELECT YEAR(`start_date`) AS start_year, YEAR(`end_date`) AS end_year, info 
+        $query = "SELECT YEAR(`start_date`) AS start_year, YEAR(`end_date`) AS end_year, `info`, `intake`, `active`, `closed` 
                 FROM admission_period WHERE id = :ai";
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
@@ -84,7 +88,7 @@ class AdminController
                 "MARINE ENG MEC" => "SHORT",
                 "CILT, DILT AND ADILT" => "SHORT"
             };
-            $query = "SELECT * FROM programs WHERE `type` = :t AND `program_code` = :p";
+            $query = "SELECT * FROM programs WHERE `type` = :t AND `code` = :p";
             $param = array(':t' => $type, ':p' => $prog_code);
         } else {
             $query = "SELECT * FROM programs";
@@ -259,53 +263,6 @@ class AdminController
         return $this->dm->inputData($query, array(":u" => $user_id));
     }
 
-    /*public function addVendor($v_name, $v_email, $v_phone, $branch)
-    {
-        // verify if a vendor with this email exists
-        if ($this->verifyVendorSysUserExists($v_email)) {
-            return array("success" => false, "message" => "A user with this email exists already exists!");
-        }
-
-
-
-        // if not prepare query and save the details 
-        $query1 = "INSERT INTO vendor_details (`id`, `type`, `company`, `branch`, `phone_number`) VALUES(:id, :tp, :nm, :b, :pn)";
-        $vendor_id = time();
-        $params1 = array(":id" => $vendor_id, ":tp" => "VENDOR", ":nm" => $v_name, ":b" => $branch, ":pn" => $v_phone);
-
-        if ($this->dm->inputData($query1, $params1)) {
-
-            $password = $this->expose->genVendorPin();
-            $hashed_pw = password_hash($password, PASSWORD_DEFAULT);
-
-            $query2 = "INSERT INTO vendor_login (`user_name`, `password`, `vendor`) VALUES(:un, :pw, :vi)";
-            $params2 = array(":un" => sha1($v_email), ":pw" => $hashed_pw, ":vi" => $vendor_id);
-            $query_result = $this->dm->inputData($query2, $params2);
-
-            if ($query_result)
-                $this->logActivity(
-                    $_SESSION["user"],
-                    "INSERT",
-                    "Added vendor {$vendor_id} with username/email {$v_email}"
-                );
-
-            $subject = "RMU Vendor Registration";
-            $message = "<p>Hi," . $v_name . " </p></br>";
-            $message .= "<p>Your account to access RMU Admissions Portal as a vendor was successful.</p>";
-            $message .= "<p>Find below your Login details.</p></br>";
-            $message .= "<p style='font-weight: bold;'>Username: " . $v_email . "</p>";
-            $message .= "<p style='font-weight: bold;'>Password: " . $password . "</p></br>";
-            $message .= "<div>Please note the following: </div>";
-            $message .= "<ol style='color:red; font-weight:bold;'>";
-            $message .= "<li>Don't let anyone see your login password</li>";
-            $message .= "<li>Access the portal and change your password</li>";
-            $message .= "</ol></br>";
-            $message .= "<p><a href='forms.rmuictonline.com/buy-vendor/'>Click here</a> to access portal.</ol>";
-
-            return $this->expose->sendEmail($v_email, $subject, $message);
-        }
-        return 0;
-    }*/
     public function saveDataFile($fileObj)
     {
         $allowedFileType = [
@@ -447,6 +404,11 @@ class AdminController
         return $this->dm->getData("SELECT * FROM programs WHERE `id` = :i", array(":i" => $prog_id));
     }
 
+    public function fetchAllFromProgramByCode($prog_code)
+    {
+        return $this->dm->getData("SELECT * FROM programs WHERE `category` = :c", array(":c" => $prog_code));
+    }
+
     public function addProgramme($prog_name, $prog_type, $prog_wkd, $prog_grp)
     {
         $query = "INSERT INTO programs (`name`, `type`, `weekend`, `group`) VALUES(:n, :t, :w, :g)";
@@ -502,7 +464,7 @@ class AdminController
         return $this->dm->getData("SELECT * FROM admission_period WHERE `active` = 1");
     }
 
-    public function fetchAdmissionPeriod($adp_id)
+    public function fetchAdmissionPeriodByID($adp_id)
     {
         $query = "SELECT * FROM admission_period WHERE id = :i";
         return $this->dm->inputData($query, array(":i" => $adp_id));
@@ -1021,6 +983,10 @@ class AdminController
             case 'apps-awaiting':
                 $result = $this->fetchAllAwaitingApplication($admin_period, $SQL_COND);
                 break;
+
+            case 'apps-enrolled':
+                $result = $this->fetchAllEnrolledApplication($admin_period, $SQL_COND);
+                break;
         }
         return $result;
     }
@@ -1055,7 +1021,7 @@ class AdminController
                 WHERE 
                     p.app_login = al.id AND pi.app_login = al.id AND fs.app_login = al.id AND
                     pd.admission_period = ap.id AND pd.form_id = ft.id AND pd.id = al.purchase_id AND 
-                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 0 AND fs.admitted = 0 AND fs.declined = 0$SQL_COND";
+                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 0 AND fs.enrolled = 0 AND fs.declined = 0$SQL_COND";
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
 
@@ -1072,7 +1038,7 @@ class AdminController
                 WHERE 
                     p.app_login = al.id AND pi.app_login = al.id AND fs.app_login = al.id AND
                     pd.admission_period = ap.id AND pd.form_id = ft.id AND pd.id = al.purchase_id AND 
-                    ap.id = :ai AND fs.declaration = 0 AND fs.admitted = 0 AND fs.declined = 0$SQL_COND";
+                    ap.id = :ai AND fs.declaration = 0 AND fs.admitted = 0 AND fs.enrolled = 0 AND fs.declined = 0$SQL_COND";
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
 
@@ -1089,7 +1055,7 @@ class AdminController
                 WHERE 
                     p.app_login = al.id AND pi.app_login = al.id AND fs.app_login = al.id AND
                     pd.admission_period = ap.id AND pd.form_id = ft.id AND pd.id = al.purchase_id AND 
-                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 1 AND fs.declined = 0$SQL_COND";
+                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 1 AND fs.enrolled = 0 AND fs.declined = 0$SQL_COND";
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
 
@@ -1106,7 +1072,7 @@ class AdminController
                 WHERE 
                     p.app_login = al.id AND pi.app_login = al.id AND fs.app_login = al.id AND
                     pd.admission_period = ap.id AND pd.form_id = ft.id AND pd.id = al.purchase_id AND 
-                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 0 AND fs.declined = 0$SQL_COND";
+                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 0 AND fs.enrolled = 0 AND fs.declined = 0$SQL_COND";
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
 
@@ -1127,6 +1093,23 @@ class AdminController
         return $this->dm->getData($query, array(":ai" => $admin_period));
     }
 
+    public function fetchAllEnrolledApplication($admin_period, $SQL_COND)
+    {
+        $query = "SELECT 
+                    al.id, CONCAT(p.first_name, ' ', IFNULL(p.middle_name, ''), ' ', p.last_name) AS fullname, 
+                    p.nationality, ft.name AS app_type, pi.first_prog, pi.second_prog, fs.declaration, fs.printed,
+                    p.phone_no1_code, p.phone_no1, pd.country_code, pd.phone_number  
+                FROM 
+                    personal_information AS p, applicants_login AS al, 
+                    forms AS ft, purchase_detail AS pd, program_info AS pi, 
+                    form_sections_chek AS fs, admission_period AS ap 
+                WHERE 
+                    p.app_login = al.id AND pi.app_login = al.id AND fs.app_login = al.id AND
+                    pd.admission_period = ap.id AND pd.form_id = ft.id AND pd.id = al.purchase_id AND 
+                    ap.id = :ai AND fs.declaration = 1 AND fs.admitted = 1 AND fs.enrolled = 1 AND fs.declined = 0$SQL_COND";
+        return $this->dm->getData($query, array(":ai" => $admin_period));
+    }
+
     // fetch data by form type and admission period
 
     public function fetchTotalAppsByProgCodeAndAdmisPeriod($prog_code = "", $admin_period = 0): mixed
@@ -1138,7 +1121,7 @@ class AdminController
                     purchase_detail AS pd, admission_period AS ap, applicants_login AS al, forms AS ft, programs AS pg 
                 WHERE 
                     ap.id = pd.admission_period AND ap.active = 1 AND al.purchase_id = pd.id 
-                    AND pd.form_id = ft.id AND pg.type = ft.id AND pg.program_code = :pc";
+                    AND pd.form_id = ft.id AND pg.type = ft.id AND pg.code = :pc";
             return $this->dm->getData($query, array(":pc" => $prog_code));
         } else {
             $query = "SELECT COUNT(*) AS total 
@@ -1147,7 +1130,7 @@ class AdminController
                     applicants_login AS al, forms AS ft, programs AS pg 
                 WHERE 
                     ap.id = pd.admission_period AND fc.app_login = al.id AND al.purchase_id = pd.id 
-                    AND pd.form_id = ft.id AND pg.type = ft.id AND pg.program_code = :pc AND ap.id = :a";
+                    AND pd.form_id = ft.id AND pg.type = ft.id AND pg.code = :pc AND ap.id = :a";
             return $this->dm->getData($query, array(":pc" => $prog_code, ":a" => $admin_period));
         }
     }
@@ -1158,7 +1141,7 @@ class AdminController
             $query = "SELECT 
                     COUNT(*) AS total 
                 FROM 
-                    purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                    purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE 
                     ap.id = pd.admission_period AND ap.active = 1 AND fc.app_login = al.id AND al.purchase_id = pd.id 
                     AND pd.form_id = ft.id";
@@ -1167,7 +1150,7 @@ class AdminController
             $query = "SELECT 
                     COUNT(*) AS total 
                 FROM 
-                    purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                    purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE 
                     ap.id = pd.admission_period AND fc.app_login = al.id AND al.purchase_id = pd.id 
                     AND pd.form_id = ft.id AND ft.id = :f AND ap.id = :a";
@@ -1179,8 +1162,8 @@ class AdminController
     {
         if (empty($prog_code)) return 0;
         $SQL_COND = "";
-        if ($prog_code == "UPGRADERS") $SQL_COND = " AND pg.program_code = 'UPGRADE'";
-        else if ($prog_code == "MASTERS") $SQL_COND = " AND pg.program_code IN ('MSC', 'MA')";
+        if ($prog_code == "UPGRADERS") $SQL_COND = " AND pg.code = 'UPGRADE'";
+        else if ($prog_code == "MASTERS") $SQL_COND = " AND pg.code IN ('MSC', 'MA')";
         $query = "SELECT COUNT(DISTINCT pd.id) AS total 
                     FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft, programs AS pg 
                     WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id 
@@ -1192,13 +1175,13 @@ class AdminController
     {
         if ($form_id == 100) {
             $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id 
                     AND pd.form_id = ft.id";
             return $this->dm->getData($query, array(":ai" => $admin_period));
         } else {
             $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id 
                     AND pd.form_id = ft.id AND ft.id = :f";
             return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
@@ -1208,16 +1191,16 @@ class AdminController
     public function fetchTotalSubmittedApps($admin_period, int $form_id)
     {
         $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id 
-                AND pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 0  AND fc.declined = 0 AND ft.id = :f";
+                AND pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 0 AND fc.declined = 0 AND ft.id = :f";
         return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
     }
 
     public function fetchTotalUnsubmittedApps($admin_period, int $form_id)
     {
         $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id 
                 AND pd.form_id = ft.id AND fc.declaration = 0 AND fc.admitted = 0  AND fc.declined = 0 AND ft.id = :f";
         return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
@@ -1226,18 +1209,27 @@ class AdminController
     public function fetchTotalAdmittedApplicants($admin_period, int $form_id)
     {
         $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id AND 
-                pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 1 AND fc.declined = 0 AND ft.id = :f";
+                pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 1 AND fc.enrolled = 0 AND fc.declined = 0 AND ft.id = :f";
         return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
     }
 
     public function fetchTotalUnadmittedApplicants($admin_period, int $form_id)
     {
         $query = "SELECT COUNT(*) AS total 
-                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
                 WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id AND 
-                pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 0 AND fc.declined = 0 AND ft.id = :f";
+                pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 0 AND fc.enrolled = 0 AND fc.declined = 0 AND ft.id = :f";
+        return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
+    }
+
+    public function fetchTotalEnrolledApplicants($admin_period, int $form_id)
+    {
+        $query = "SELECT COUNT(*) AS total 
+                FROM purchase_detail AS pd, admission_period AS ap, form_sections_chek AS fc, applicants_login AS al, forms AS ft 
+                WHERE ap.id = pd.admission_period AND ap.id = :ai AND fc.app_login = al.id AND al.purchase_id = pd.id AND 
+                pd.form_id = ft.id AND fc.declaration = 1 AND fc.admitted = 1 AND fc.enrolled = 1 AND fc.declined = 0 AND ft.id = :f";
         return $this->dm->getData($query, array(":f" => $form_id, ":ai" => $admin_period));
     }
 
@@ -1255,12 +1247,12 @@ class AdminController
     public function fetchTotalAwaitingResults()
     {
         $query = "SELECT COUNT(pd.id) AS total 
-                FROM purchase_detail AS pd, form_sections_chek AS fc, 
-                applicants_login AS al, forms AS ft, academic_background AS ab 
-                WHERE fc.app_login = al.id AND 
-                al.purchase_id = pd.id AND ab.app_login = al.id AND pd.form_id = ft.id AND fc.`declaration` = 1 AND 
-                ab.`awaiting_result` = 1 AND ab.cert_type = 'WASSCE' AND ab.country = 'GHANA' AND 
-                pd.id NOT IN (SELECT admission_number FROM downloaded_awaiting_results)";
+        FROM purchase_detail AS pd, form_sections_chek AS fc, 
+        applicants_login AS al, forms AS ft, academic_background AS ab 
+        WHERE fc.app_login = al.id AND 
+        al.purchase_id = pd.id AND ab.app_login = al.id AND pd.form_id = ft.id AND fc.`declaration` = 1 AND 
+        ab.`awaiting_result` = 1 AND ab.cert_type = 'WASSCE' AND ab.country = 'GHANA' AND 
+        pd.id NOT IN (SELECT admission_number FROM downloaded_awaiting_results)";
         return $this->dm->getData($query);
     }
 
@@ -1268,12 +1260,9 @@ class AdminController
     {
         $in_query = "";
         if ($cert_type != "All") $in_query = "AND ab.cert_type = '$cert_type'";
-        $query = "SELECT p.`first_name`, p.`middle_name`, p.`last_name`, fs.first_prog_qualified, fs.second_prog_qualified, 
-                    pi.first_prog, pi.second_prog, pi.application_term, pi.study_stream, pd.`form_id`, a.id 
-                FROM `personal_information` AS p, `applicants_login` AS a, form_sections_chek AS fs, 
-                    academic_background AS ab, program_info AS pi, purchase_detail AS pd 
-                WHERE p.app_login = a.id AND ab.app_login = a.id AND fs.app_login = a.id AND 
-                    pd.id = a.purchase_id AND pi.app_login = a.id AND fs.admitted = 1 $in_query";
+        $query = "SELECT p.`first_name`, p.`middle_name`, p.`last_name`, fs.application_term, pi.study_stream, a.id AS app_id 
+                FROM `personal_information` AS p, `applicants_login` AS a, form_sections_chek AS fs 
+                WHERE p.app_login = a.id AND fs.app_login = a.id AND fs.admitted = 1 $in_query";
         return $this->dm->getData($query);
     }
 
@@ -1387,23 +1376,41 @@ class AdminController
         return $store;
     }
 
-    public function fetchAllAdmittedApplicantsData($cert_type)
+    public function fetchAllAdmittedApplicantsData1($cert_type)
     {
         $allAppData = $this->getAllAdmitedApplicants($cert_type);
         if (empty($allAppData)) return 0;
-
         $store = $this->bundleApplicantsData($allAppData);
         return $store;
     }
 
+    public function fetchAllEnrolledApplicantsData($cert_type, $prog_type)
+    {
+        if (!empty($prog_type)) {
+            $query = "SELECT s.*, 
+            CONCAT(s.first_name, ' ', IF(s.middle_name <> '', CONCAT(s.middle_name, ' '), ''), s.last_name) AS full_name, 
+            p.`id` AS program_id, p.`name` AS program_name, p.`category` AS program_category, p.`type` AS program_type  
+            FROM `student` AS s, `programs` AS p WHERE s.`fk_program` = p.`id` AND p.`id` = :p";
+            $params = array(":p" => $prog_type);
+        } else if (!empty($cert_type)) {
+            $query = "SELECT s.*, 
+            CONCAT(s.first_name, ' ', IF(s.middle_name <> '', CONCAT(s.middle_name, ' '), ''), s.last_name) AS full_name, 
+            p.`id` AS program_id, p.`name` AS program_name, p.`category` AS program_category, p.`type` AS program_type  
+            FROM `student` AS s, `programs` AS p WHERE s.`fk_program` = p.`id` AND p.`category` = :c";
+            $params = array(":c" => $cert_type);
+        }
+        return $this->dm->getData($query, $params);
+    }
+
     public function fetchAllSubmittedApplicantsData($cert_type)
     {
-        if ($cert_type == "MASTERS") $in_query = "WHERE pg.program_code IN ('MSC', 'MA')";
-        else if ($cert_type == "UPDRADERS") $in_query = "WHERE pg.program_code = 'UPGRADE'";
-        else if ($cert_type == "DEGREE") $in_query = "WHERE pg.program_code = 'BSC'";
-        else if ($cert_type == "DIPLOMA") $in_query = "WHERE pg.program_code = 'DIPLOMA'";
+        if ($cert_type == "MASTERS") $in_query = "WHERE pg.code IN ('MSC', 'MA')";
+        else if ($cert_type == "UPGRADERS") $in_query = "WHERE pg.code = 'UPGRADE'";
+        else if ($cert_type == "DEGREE") $in_query = "WHERE pg.code = 'BSC'";
+        else if ($cert_type == "DIPLOMA") $in_query = "WHERE pg.code = 'DIPLOMA'";
         else if ($cert_type == "MEM") $in_query = "WHERE pg.name = 'MARINE ENGINE MECHANICS'";
         else if ($cert_type == "CDADILT") $in_query = "WHERE pg.name = 'CILT, DILT AND ADILT'";
+        else return array("success" => false, "message" => "No match found for this certificate type [{$cert_type}]");
 
         $query = "SELECT 
                     a.`id`, CONCAT(p.first_name, ' ', IFNULL(p.middle_name, ''), ' ', p.last_name) AS full_name, 
@@ -1414,7 +1421,7 @@ class AdminController
                                 WHEN ab.`cert_type` = 'OTHER' THEN ab.`other_cert_type`
                                 ELSE ab.`cert_type`
                             END,
-                            ', ',
+                            ' - ',
                             ab.`school_name`,
                             ' (',
                             ab.`year_completed`,
@@ -1511,10 +1518,6 @@ class AdminController
             $this->dm->getData($query, array(":i" => $app_result["id"]));
             return $qualified;
         }
-    }
-
-    private function admitWASSCELike($data)
-    {
     }
 
     public function admitByCatA($data)
@@ -1724,7 +1727,11 @@ class AdminController
 
     private function getApplicantContactInfo($appID)
     {
-        $sql = "SELECT * FROM `personal_information` WHERE `app_login` = :i";
+        $sql = "SELECT al.`id`, pd.`app_number`, pi.`prefix` , pi.`first_name`, pi.`middle_name`, pi.`last_name`, 
+                pi.`suffix`, pi.`gender`, pi.`dob`, pi.`marital_status`, pi.`nationality`, pi.`disability`, 
+                pi.`photo`, pi.`phone_no1_code`, pi.`phone_no1`, pi.`email_addr` 
+                FROM `personal_information` AS pi, `applicants_login` AS al, `purchase_detail` AS pd 
+                WHERE pi.`app_login` = al.`id` AND al.`purchase_id` = pd.`id` AND al.`id` = :i";
         return $this->dm->getData($sql, array(':i' => $appID));
     }
 
@@ -1780,38 +1787,396 @@ class AdminController
         return array("success" => true, "message" => $output);
     }
 
-    private function generateApplicantAdmissionLetter($appID): mixed
+    public function fetchApplicantPersInfoByAppID($appID): mixed
+    {
+        return $this->dm->getData("SELECT * FROM `personal_information` WHERE app_login = :i", array(":i" => $appID));
+    }
+
+    public function fetchApplicantProgInfoByAppID($appID): mixed
+    {
+        return $this->dm->getData("SELECT * FROM `program_info` WHERE app_login = :i", array(":i" => $appID));
+    }
+
+    public function fetchApplicantProgInfoByProgName($progName): mixed
+    {
+        return $this->dm->getData("SELECT p.*, f.`name` AS form_type FROM `programs` AS p, `forms` AS f 
+        WHERE p.`name` = :n AND p.`type` = f.`id`", array(":n" => $progName));
+    }
+
+    public function fetchApplicantProgInfoByProgID($progID): mixed
+    {
+        return $this->dm->getData("SELECT * FROM `programs` WHERE `id` = :i", array(":i" => $progID));
+    }
+
+    public function fetchAdmissionLetterData(): mixed
+    {
+        return $this->dm->getData("SELECT * FROM `admission_letter_data` WHERE `in_use` = 1");
+    }
+
+    public function fetchApplicantAppNumber(int $appID): mixed
+    {
+        return $this->dm->getData("SELECT pd.`app_number` FROM `purchase_detail` AS pd, applicants_login AS al 
+        WHERE al.purchase_id = pd.id AND al.id = :i", array(":i" => $appID));
+    }
+
+    public function checkProgramStreamAvailability($progName, $stream_applied): mixed
+    {
+        $prog_info = $this->fetchApplicantProgInfoByProgName($progName)[0];
+
+        if ($prog_info["weekend"] == 0) {
+            if (strtolower($stream_applied) === "weekend") {
+                return [
+                    "success" => false,
+                    "data" => $prog_info["id"],
+                    "message" => "Selected program is not available for {$stream_applied} stream!"
+                ];
+            }
+        }
+
+        if ($prog_info["regular"] == 0) {
+            if (strtolower($stream_applied) === "regular") {
+                return [
+                    "success" => false,
+                    "data" => $prog_info["id"],
+                    "message" => "Selected program is not available for {$stream_applied} stream!"
+                ];
+            }
+        }
+
+        return [
+            "success" => true,
+            "data" => $prog_info["id"],
+            "message" => "Selected program is available for {$stream_applied} stream!"
+        ];
+    }
+
+    private function generateApplicantAdmissionLetter1($letter_data, $letter_type = "undergrade", $admission_period = []): mixed
     {
         try {
-            // Load the Word document
-            $phpWordObj = \PhpOffice\PhpWord\IOFactory::createReader("Word2007");
-            $phpWord = $phpWordObj->load(__DIR__ . '/letter_template.docx');
+            $dir_path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'admission_letters' . DIRECTORY_SEPARATOR;
+            if (!is_dir($dir_path)) mkdir($dir_path, 0755, true);
 
-            // Replace placeholders with actual data
-            $phpWord->setValue('Full_Name', "Francis Anlimah");
+            $template_processor = new TemplateProcessor($dir_path . $letter_type . '_template.docx');
 
-            // Save the modified document
-            $phpWord->save(__DIR__ . '/modified_document.docx');
-            return 1;
+            $temp_parent = $dir_path . strtolower($admission_period["intake"]) . DIRECTORY_SEPARATOR;
+            if (!is_dir($temp_parent)) mkdir($temp_parent, 0755, true);
+
+            $sub_parent = $temp_parent . strtolower($admission_period["academic_year"]) . DIRECTORY_SEPARATOR;
+            if (!is_dir($sub_parent)) mkdir($sub_parent, 0755, true);
+
+            $temp_path = $sub_parent . strtolower($admission_period["semester"]) . DIRECTORY_SEPARATOR;
+            if (!is_dir($temp_path)) mkdir($temp_path, 0755, true);
+
+            $template_processor->setValues($letter_data);
+            $template_processor->saveAs($temp_path . "{$letter_data['app_number']}.docx");
+
+            return array("success" => true, "message" => "Admission letter successfully generated!");
         } catch (\Exception $e) {
-            return 'Error: ' . $e->getMessage();
+            return array("success" => false, "message" => $e->getMessage());
         }
     }
 
-    private function sendAdmissionLetter(): mixed
+    private function generateApplicantAdmissionLetter($letter_data, $letter_type = "undergrade", $admission_period = [], $program): mixed
     {
+        try {
+            $dir_path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'admission_letters' . DIRECTORY_SEPARATOR;
+
+            // Create directories recursively
+            $academic_year_path = $dir_path . strtolower($admission_period["academic_year"]) . DIRECTORY_SEPARATOR;
+            $intake_path = $academic_year_path . strtolower($admission_period["intake"]) . DIRECTORY_SEPARATOR;
+            $program_category = $intake_path . strtolower($letter_data['Program_Type']) . DIRECTORY_SEPARATOR;
+            $stream_applied = $program_category . strtolower($letter_data['Program_Stream']) . DIRECTORY_SEPARATOR;
+            $program_applied = $stream_applied . strtolower($program) . DIRECTORY_SEPARATOR;
+
+            foreach ([$academic_year_path, $intake_path, $program_category, $stream_applied, $program_applied] as $path) {
+                if (!is_dir($path)) mkdir($path, 0755, true);
+            }
+
+            $template_processor = new TemplateProcessor($dir_path . $letter_type . '_template.docx');
+            $word_output_path = $program_applied . "{$letter_data['app_number']}.docx";
+
+            $template_processor->setValues($letter_data);
+            $template_processor->saveAs($word_output_path);
+
+            // Convert the Word document to PDF
+            $vendor_path = ".." . DIRECTORY_SEPARATOR . "vendor" . DIRECTORY_SEPARATOR . 'dompdf' . DIRECTORY_SEPARATOR . 'dompdf';
+            Settings::setPdfRenderer(Settings::PDF_RENDERER_DOMPDF, $vendor_path);
+
+            $phpWord = IOFactory::load($word_output_path);
+            $pdf_output_path = $program_applied . "{$letter_data['app_number']}.pdf";
+            $pdfWriter = IOFactory::createWriter($phpWord, 'PDF');
+            $pdfWriter->save($pdf_output_path);
+
+            return [
+                "success" => true,
+                "message" => "Admission letter successfully generated!",
+                "acceptance_form_path" => $dir_path . "acceptance_form.docx",
+                "letter_word_path" => $word_output_path,
+                "letter_pdf_path" => $pdf_output_path
+            ];
+        } catch (\Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
     }
 
-    public function admitIndividualApplicant($appID, $progName)
+    private function loadApplicantAdmissionLetterData($appID, $prog_id, $stream_applied): mixed
     {
-        $progInfo = $this->fetchAllFromProgramByName($progName);
-        $query = "UPDATE `form_sections_chek` SET `admitted` = 1, `declined` = 0, `programme_awarded` = :p WHERE `app_login` = :i";
-        if ($this->dm->inputData($query, array(":i" => $appID, ":p" => $progInfo[0]["id"]))) {
-            return array("success" => true, "message" => $this->generateApplicantAdmissionLetter($appID));
-            //$this->sendAdmissionLetter($appID);
-            return array("success" => true, "message" => "Applicant awarded " . $progName);
+        $app_pers_info = $this->fetchApplicantPersInfoByAppID($appID)[0];
+        $app_app_number = $this->fetchApplicantAppNumber($appID)[0];
+        $static_letter_data = $this->fetchAdmissionLetterData()[0];
+        $admission_period = $this->fetchCurrentAdmissionPeriod()[0];
+        $prog_info = $this->fetchAllFromProgramByID($prog_id)[0];
+
+        $letter_data = [];
+
+        switch ($prog_info["code"]) {
+            case 'BSC':
+            case 'DIPLOMA':
+
+                $program_name = ($prog_info["category"] === "DIPLOMA") ? str_replace(["diploma in ", "diploma "], "", strtolower($prog_info["name"])) : $prog_info["name"];
+                $program_name = ($prog_info["category"] === "DEGREE") ? str_replace(["b.sc ", "b.sc. ", "b.s.c ", "b.s.c. "], "", strtolower($prog_info["name"])) : $prog_info["name"];
+                $program_name = str_replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], " ", $program_name);
+
+                $letter_data = [
+                    "success" => true,
+                    "type" => "undergrade",
+                    "period" => $admission_period,
+                    "program" => $program_name,
+                    "phone_number" => $app_pers_info["phone_no1_code"] . $app_pers_info["phone_no1"],
+                    "email_address" => $app_pers_info["email_addr"],
+                    "data" => [
+                        'app_number' => $app_app_number["app_number"],
+                        'Prefix' => ucwords(strtolower($app_pers_info["prefix"])),
+                        'First_Name' => ucwords(strtolower($app_pers_info["first_name"])),
+                        'Middle_Name' => ucwords(strtolower($app_pers_info["middle_name"])),
+                        'Last_Name' => ucwords(strtolower($app_pers_info["last_name"])),
+                        'Full_Name' => ucwords(strtolower(!empty($app_pers_info["middle_name"]) ? $app_pers_info["first_name"] . " " . $app_pers_info["middle_name"] . " " .  $app_pers_info["last_name"] : $app_pers_info["first_name"] . " " . $app_pers_info["last_name"])),
+                        'Box_Location' => ucwords(strtolower($app_pers_info["postal_town"] . " - " . $app_pers_info["postal_spr"])),
+                        'Box_Address' => ucwords(strtolower($app_pers_info["postal_addr"])),
+                        'Location' => ucwords(strtolower($app_pers_info["postal_country"])),
+                        'Year_of_Admission' => $admission_period["academic_year"],
+                        'Program_Length_1' => strtoupper(strtolower($prog_info["duration"] . "-" . $prog_info["dur_format"])),
+                        'Program_Offered_1' => strtoupper(strtolower($prog_info["name"])),
+                        'Program_Length_2' => strtolower($prog_info["duration"] . "-" . $prog_info["dur_format"]),
+                        'Program_Offered_2' => (($prog_info["category"] === "DEGREE") ? "B.Sc " : "") . ucwords(strtolower($program_name)),
+                        'Program_Type' => ucwords(strtolower($prog_info["category"])),
+                        'Program_Stream' => trim(strtolower($stream_applied)),
+                        'No_of_Semesters' => $prog_info["num_of_semesters"] . " semesters",
+                        'Commencement_Date' => (new \DateTime($static_letter_data["commencement_date"]))->format("l F j, Y"),
+                        'Initial_Fees_in_Words' => $static_letter_data["initial_fees_in_words"],
+                        'Initial_Fees_in_Figures' => $static_letter_data["initial_fees_in_figures"],
+                        'Tel_Number_1' => $static_letter_data["tel_number_1"],
+                        'Tel_Number_2' => $static_letter_data["tel_number_2"],
+                        'Closing_Date' => (new \DateTime($static_letter_data["closing_date"]))->format("l F j, Y"),
+                        'Orientation_Date' => (new \DateTime($static_letter_data["orientation_date"]))->format("l F j, Y"),
+                        'Deadline_Date' => (new \DateTime($static_letter_data["deadline_date"]))->format("l F j, Y"),
+                        'Registration_Fees_in_Words' => $static_letter_data["registration_fees_in_words"],
+                        'Registration_Fees_in_Figures' => $static_letter_data["registration_fees_in_figures"],
+                        'University_Registrar' => $static_letter_data["university_registrar"],
+                        'Program_Code' => $prog_info["code"],
+                        'Program_Faculty' => ucwords(strtolower($prog_info["faculty"])),
+                        'Program_Merit' => ucwords(strtolower($prog_info["merit"])),
+                        'Program_Duration' => $prog_info["duration"],
+                        'Program_Dur_Format' => ucwords(strtolower($prog_info["dur_format"]))
+                    ]
+                ];
+                break;
+
+            case 'MSC':
+            case 'MA':
+
+                $program_name = ($prog_info["category"] === "MASTERS") ? str_replace(["m.sc ", "m.sc. ", "m.s.c ", "m.s.c. ", "m.a ", "m.a. "], "", strtolower($prog_info["name"])) : $prog_info["name"];
+                $program_name = str_replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], " ", $program_name);
+
+                $letter_data = [
+                    "success" => true,
+                    "type" => "postgrade",
+                    "period" => $admission_period,
+                    "program" => $program_name,
+                    "phone_number" => $app_pers_info["phone_no1_code"] . $app_pers_info["phone_no1"],
+                    "email_address" => $app_pers_info["email_addr"],
+                    "data" => [
+                        'app_number' => $app_app_number["app_number"],
+                        'First_Name' => ucwords(strtolower($app_pers_info["first_name"])),
+                        'Middle_Name' => ucwords(strtolower($app_pers_info["middle_name"])),
+                        'Last_Name' => ucwords(strtolower($app_pers_info["last_name"])),
+                        'Full_Name' => ucwords(strtolower(!empty($app_pers_info["middle_name"]) ? $app_pers_info["first_name"] . " " . $app_pers_info["middle_name"] . " " .  $app_pers_info["last_name"] : $app_pers_info["first_name"] . " " . $app_pers_info["last_name"])),
+                        'Box_Location' => ucwords(strtolower($app_pers_info["postal_town"] . " - " . $app_pers_info["postal_spr"])),
+                        'Box_Address' => ucwords(strtolower($app_pers_info["postal_addr"])),
+                        'Location' => ucwords(strtolower($app_pers_info["postal_country"])),
+                        'Year_of_Admission' => $admission_period["academic_year"],
+                        'Program_Length_1' => strtoupper(strtolower($prog_info["duration"] . "-" . $prog_info["dur_format"])),
+                        'Program_Offered_1' => strtoupper(strtolower($prog_info["name"])),
+                        'Program_Length_2' => strtolower($prog_info["duration"] . "-" . $prog_info["dur_format"]),
+                        'Program_Offered_2' => (($prog_info["code"] === "MSC") ? "M.Sc " : "M.A ") . ucwords(strtolower($program_name)),
+                        'Program_Type' => ucwords(strtolower($prog_info["category"])),
+                        'Program_Stream' => strtolower($stream_applied),
+                        'No_of_Semesters' => $prog_info["num_of_semesters"] . " semesters",
+                        'Commencement_Date' => (new \DateTime($static_letter_data["commencement_date"]))->format("l F j, Y"),
+                        'Initial_Fees_in_Words' => $static_letter_data["initial_fees_in_words"],
+                        'Initial_Fees_in_Figures' => $static_letter_data["initial_fees_in_figures"],
+                        'Tel_Number_1' => $static_letter_data["tel_number_1"],
+                        'Tel_Number_2' => $static_letter_data["tel_number_2"],
+                        'Closing_Date' => (new \DateTime($static_letter_data["closing_date"]))->format("l F j, Y"),
+                        'Orientation_Date' => (new \DateTime($static_letter_data["orientation_date"]))->format("l F j, Y"),
+                        'Deadline_Date' => (new \DateTime($static_letter_data["deadline_date"]))->format("l F j, Y"),
+                        'Registration_Fees_in_Words' => $static_letter_data["registration_fees_in_words"],
+                        'Registration_Fees_in_Figures' => $static_letter_data["registration_fees_in_figures"],
+                        'University_Registrar' => $static_letter_data["university_registrar"],
+                        'Program_Code' => $prog_info["code"],
+                        'Program_Faculty' => ucwords(strtolower($prog_info["faculty"])),
+                        'Program_Merit' => ucwords(strtolower($prog_info["merit"])),
+                        'Program_Duration' => $prog_info["duration"],
+                        'Program_Dur_Format' => ucwords(strtolower($prog_info["dur_format"]))
+                    ]
+                ];
+                break;
+
+            case 'UPGRADE':
+                $letter_data = [
+                    "success" => true,
+                    "type" => "upgrade",
+                    "period" => $admission_period,
+                    "phone_number" => $app_pers_info["phone_no1_code"] . $app_pers_info["phone_no1"],
+                    "email_address" => $app_pers_info["email_addr"],
+                    "data" => [
+                        'app_number' => $app_app_number["app_number"],
+                        'First_Name' => ucwords(strtolower($app_pers_info["first_name"])),
+                        'Middle_Name' => ucwords(strtolower($app_pers_info["middle_name"])),
+                        'Last_Name' => ucwords(strtolower($app_pers_info["last_name"])),
+                        'Full_Name' => !empty($app_pers_info["middle_name"]) ? $app_pers_info["first_name"] . " " . $app_pers_info["middle_name"] .  " " .  $app_pers_info["last_name"] : $app_pers_info["first_name"] . " " . $app_pers_info["last_name"],
+                        'Box_Location' => $app_pers_info["postal_town"] . " " . $app_pers_info["postal_spr"],
+                        'Box_Address' => $app_pers_info["postal_addr"],
+                        'Location' => $app_pers_info["postal_country"],
+                        'Year_of_Admission' => $admission_period["academic_year"],
+                        'Program_Length_1' => $prog_info["duration"] . "-" . $prog_info["dur_format"],
+                        'Program_Offered_1' => $prog_info["name"],
+                        'Program_Length_2' => $prog_info["duration"] . "-" . $prog_info["dur_format"],
+                        'Program_Offered_2' => ucwords($prog_info["name"]),
+                        'Program_Type' => ucwords($prog_info["form_type"]),
+                        'Program_Stream' => strtolower($stream_applied),
+                        'No_of_Semesters' => $prog_info["num_of_semesters"] . " semesters",
+                        'Commencement_Date' => (new \DateTime($letter_data["commencement_date"]))->format("l F j, Y"),
+                        'Initial_Fees_in_Words' => $letter_data["initial_fees_in_words"],
+                        'Initial_Fees_in_Figures' => $letter_data["initial_fees_in_figures"],
+                        'Tel_Number_1' => $letter_data["tel_number_1"],
+                        'Tel_Number_2' => $letter_data["tel_number_2"],
+                        'Closing_Date' => (new \DateTime($letter_data["closing_date"]))->format("l F j, Y"),
+                        'Orientation_Date' => (new \DateTime($letter_data["orientation_date"]))->format("l F j, Y"),
+                        'Deadline_Date' => (new \DateTime($letter_data["deadline_date"]))->format("l F j, Y"),
+                        'Registration_Fees_in_Words' => $letter_data["registration_fees_in_words"],
+                        'Registration_Fees_in_Figures' => $letter_data["registration_fees_in_figures"],
+                        'University_Registrar' => $letter_data["university_registrar"],
+                        'Program_Code' => $prog_info["code"],
+                        'Program_Faculty' => ucwords(strtolower($prog_info["faculty"])),
+                        'Program_Merit' => ucwords(strtolower($prog_info["merit"])),
+                        'Program_Duration' => $prog_info["duration"],
+                        'Program_Dur_Format' => ucwords(strtolower($prog_info["dur_format"]))
+                    ]
+                ];
+                break;
+
+            default:
+                $letter_data = [
+                    "success" => false,
+                    "message" => ["There's no letter format set for the applied program category!"]
+                ];
+                break;
         }
-        return array("success" => false, "message" => "Failed to admit applicant!");
+        return $letter_data;
+    }
+
+    private function updateApplicantAdmissionStatus($app_id, $prog_id, $extras = []): mixed
+    {
+        $extras_query = "";
+        if (!empty($extras)) {
+            $extras_query = "`emailed_letter` = 1, `notified_sms` = 1, ";
+        } else {
+            if (isset($extras["emailed_letter"])) {
+                if (empty($extras["emailed_letter"])) $extras_query .= "`emailed_letter` = 0, ";
+                else $extras_query .= "`emailed_letter` = 1, ";
+            }
+            if (isset($extras["notified_sms"])) {
+                if (empty($extras["notified_sms"])) $extras_query .= "`notified_sms` = 0, ";
+                else $extras_query .= "`notified_sms` = 1, ";
+            }
+        }
+        $query = "UPDATE `form_sections_chek` SET `admitted` = 1, `declined` = 0,{$extras_query} `programme_awarded` = :p WHERE `app_login` = :i";
+        return ($this->dm->inputData($query, array(":i" => $app_id, ":p" => $prog_id)));
+    }
+
+    private function sendAdmissionLetterViaEmail($data, $file_paths = []): mixed
+    {
+        //return $data;
+        $pmd = match ($data["data"]["Program_Code"]) {
+            "BSC" => ["Bachelor of Science", "B.Sc."],
+            "DIPLOMA" => ["Diploma", "Diploma"],
+            "MSC" => ["Master of Science", "M.Sc."],
+            "MA" => ["Master of Art", "M.A."]
+        };
+
+        $dur_word = match ($data["data"]["Program_Duration"]) {
+            '1' => 'One',
+            '2' => 'Two',
+            '3' => 'Three',
+            '4' => 'Four',
+            '5' => 'Five',
+            '6' => 'Six',
+            '7' => 'Seven',
+            '8' => 'Eight',
+            '9' => 'Nine',
+            '10' => 'Ten'
+        };
+
+        $email = $data["email_address"];
+        $subject = "Admission to Regional Maritime University";
+        $message = "<p>Dear " . $data["data"]["Prefix"] . " " . $data["data"]["First_Name"] . " " . $data["data"]["Last_Name"] . ",</p>";
+        $message .= "<p>Compliments from the School of Undergraduate Studies (SUS)";
+        $message .= "<p>The School of Undergraduate Studies on behalf of the Academic Council of the University is pleased to offer ";
+        $message .= "you admission to pursue a {$dur_word} ({$data["data"]["Program_Duration"]}) {$data["data"]["Program_Dur_Format"]} <strong>{$data["data"]["Program_Stream"]}</strong> ";
+        $message .= "{$pmd[0]} ({$pmd[1]}) programme in {$data["data"]["Program_Merit"]} in the Faculty of ";
+        $message .= "{$data["data"]["Program_Faculty"]} of the University. </p>";
+        $message .= "<p>Kindly find attached a copy of your admission letter, alongside the fees payment details and a copy of the acceptance form. ";
+        $message .= "The Original copy of the attached documents are available at the University's Registry Office for collection ";
+        $message .= "from <strong>Monday to Friday between the hours of 9a.m. to 3p.m.</strong></p>";
+        $message .= "<p>Do not hesitate to contact <a href='mailto:admission@rmu.edu.gh'>admission@rmu.edu.gh</a> for any clarification.</p>";
+        $message .= "<p>Congratulations on your enrollment to the Regional Maritime University.</p>";
+        $message .= "<p>Thank you and warm regards.</p>";
+
+        $response = $this->expose->sendEmail($email, $subject, $message, $file_paths);
+        if (!empty($response) && is_int($response)) return 1;
+        return 0;
+    }
+
+    private function notifyApplicantViaSMS($data): mixed
+    {
+        $to = $data["phone_number"];
+        $message = "Congratulations! You have been admitted to Regional Maritime University to pursue {$data["data"]["Program_Offered_2"]}. ";
+        $message .= "Kindly check your mail box for more details.";
+        $response = json_decode($this->expose->sendSMS($to, $message));
+        if (!$response->status) return 1;
+        return 0;
+    }
+
+    public function admitIndividualApplicant($appID, $prog_id, $stream_applied, bool $email_letter = false, bool $sms_notify = false)
+    {
+        $l_res = $this->loadApplicantAdmissionLetterData($appID, $prog_id, $stream_applied);
+        if (!$l_res["success"]) return $l_res;
+
+        $g_res = $this->generateApplicantAdmissionLetter($l_res["data"], $l_res["type"], $l_res["period"], $l_res["program"]);
+        if (!$g_res["success"]) return $g_res;
+        //return $g_res;
+        $file_paths = [];
+        array_push($file_paths, $g_res["letter_word_path"], $g_res["acceptance_form_path"]);
+        $status_update_extras = [];
+
+        if ($email_letter) $status_update_extras["emailed_letter"] = $this->sendAdmissionLetterViaEmail($l_res, $file_paths);
+        //return $this->sendAdmissionLetterViaEmail($l_res, $file_paths);
+        if ($sms_notify) $status_update_extras["notified_sms"] = $this->notifyApplicantViaSMS($l_res);
+
+        $u_res = $this->updateApplicantAdmissionStatus($appID, $prog_id, $status_update_extras);
+        if (!$u_res) return array("success" => false, "message" => "Failed to admit applicant!");
+        return array("success" => true, "message" => "Successfully admitted applicant!");
     }
 
     public function declineIndividualApplicant($appID)
@@ -1829,25 +2194,76 @@ class AdminController
         return $this->dm->inputData($query, array(":i" => $appID, ":ss" => $statusState));
     }
 
+    public function fetchAllFromProgramWithDepartByProgID($prog_id)
+    {
+        $query = "SELECT pg.*, dp.`id` AS department_id, dp.`name` AS department_name 
+        FROM `programs` AS pg, `department` AS dp WHERE pg.`id` = :i AND pg.`fk_department` = dp.`id`";
+        return $this->dm->getData($query, array(":i" => $prog_id));
+    }
+
     public function sendAdmissionFiles($appID, $fileObj): mixed
     {
     }
 
-    private function createStudentIndexNumber($progID): mixed
+    private function getAdmissionPeriodYearsByID($admin_period): mixed
     {
-        $progInfo = $this->fetchAllFromProgramByID($progID)[0];
+        return $this->dm->getData(
+            "SELECT *, YEAR(`start_date`) AS sYear, YEAR(`end_date`) AS eYear FROM admission_period WHERE id = :i",
+            array(":i" => $admin_period)
+        );
+    }
 
-        $adminPeriodYear = $this->dm->getData(
-            "SELECT YEAR(`start_date`) AS sYear FROM admission_period WHERE id = :i",
-            array(":i" => $_SESSION["admin_period"])
-        )[0]["sYear"];
+    private function getTotalEnrolledApplicants($prog_id, $academic_year_id, $stream): mixed
+    {
+        return $this->dm->getData(
+            "SELECT COUNT(s.`app_number`) AS total FROM `student` AS s, `academic_year` AS a, `programs` AS p 
+            WHERE p.`id` = s.`fk_program` AND a.`id` = s.`fk_academic_year` AND 
+            s.`fk_program` = :p AND s.`fk_academic_year` = :a AND s.`stream_admitted` = :s",
+            array(":p" => $prog_id, ":a" => $academic_year_id, ":s" => $stream)
+        )[0]["total"];
+    }
 
-        $startYear = (int) substr($adminPeriodYear, -2);
+    private function resolveClassByProgram($prog_id, $class_code = ''): mixed
+    {
+        if (empty($class_code)) return array("success" => false, "message" => "Couldn't resolve student class!");
+        $class = $this->dm->getData("SELECT `code` FROM `class` WHERE `code` = :c", array(":c" => $class_code));
+        if (!empty($class)) return array("success" => true, "message" => $class_code);
+        $query = "INSERT INTO `class` (`code`, `fk_program`) VALUES (:c, :fkp)";
+        $added = $this->dm->inputData($query, array(':c' => $class_code, ':fkp' => $prog_id));
+        if (empty($added)) return  array("success" => false, "message" => "Couldn't add/create a new class for student!");
+        return array("success" => true, "message" => $class_code);
+    }
 
-        $stdCount = $this->dm->getData(
-            "SELECT COUNT(programme) AS total FROM enrolled_applicants WHERE programme = :p",
-            array(":p" => $progInfo["name"])
-        )[0]["total"] + 1;
+    private function createUndergradStudentIndexNumber($appID, $progID): mixed
+    {
+        $prog_data = $this->fetchAllFromProgramWithDepartByProgID($progID);
+        if (empty($prog_data)) return array(
+            "success" => false,
+            "message" => "Process terminated! Couldn't fetch applicant's program data"
+        );
+
+        $adminPeriodYear = $this->getAdmissionPeriodYearsByID($_SESSION["admin_period"]);
+
+        $startYear = (int) substr($adminPeriodYear[0]["sYear"], -2);
+        if ($prog_data[0]["dur_format"] == "year") $completionYear = $startYear +  (int) $prog_data[0]["duration"];
+
+        $class_code = $prog_data[0]["index_code"] . $completionYear;
+        $class = $this->resolveClassByProgram($progID, $class_code);
+        if (!$class["success"]) return $class;
+
+        $stream_data = $this->getAppProgDetailsByAppID($appID);
+        if (empty($stream_data)) return array(
+            "success" => false,
+            "message" => "Process terminated! Couldn't fetch applicant's stream data."
+        );
+
+        $stream = $stream_data[0]["study_stream"];
+        $index_code = $prog_data[0]["index_code"];
+
+        //check whether it's regular or weekend
+        if (strtolower($stream) === "weekend") $index_code = substr($prog_data[0]["index_code"], 0, 2) . "W";
+
+        $stdCount = $this->getTotalEnrolledApplicants($prog_data[0]["id"], $adminPeriodYear[0]["fk_academic_year"], $stream) + 1;
 
         if ($stdCount <= 10) $numCount = "0000";
         elseif ($stdCount <= 100) $numCount = "000";
@@ -1855,8 +2271,155 @@ class AdminController
         elseif ($stdCount <= 10000) $numCount = "0";
         elseif ($stdCount <= 100000) $numCount = "";
 
-        if ($progInfo["dur_format"] == "year") $completionYear = $startYear +  (int) $progInfo["duration"];
-        return array("index_number" => $progInfo["index_code"] . $numCount . $stdCount . $completionYear, "programme" => $progInfo["name"]);
+        $indexNumber = $index_code . $numCount . $stdCount . $completionYear;
+
+        return array(
+            "success" => true,
+            "message" => array(
+                "index_number" => $indexNumber,
+                "class" => $class_code,
+                "program" => $prog_data[0]["id"],
+                "department" => $prog_data[0]["department_id"],
+                "stream" => $stream,
+                "academic_year" => $adminPeriodYear[0]["fk_academic_year"],
+                "pi" => $prog_data
+            )
+        );
+    }
+
+    private function createStudentEmailAddress($appID): mixed
+    {
+        $studentNames = $this->fetchApplicantPersInfoByAppID($appID)[0];
+        $fname = trim($studentNames["first_name"]);
+        $mname = trim($studentNames["middle_name"]);
+        $lname = trim($studentNames["last_name"]);
+
+        $emailID = $fname . "." . $lname;
+        $testEmailAddress = strtolower($emailID . "@st.rmu.edu.gh");
+        $emailVerified = $this->verifyStudentEmailAddress($testEmailAddress);
+
+        if (!empty($emailVerified)) {
+            if (!empty($mname)) {
+                $emailID = $fname . "." . $mname . "-" . $lname;
+                $testEmailAddress = strtolower($emailID . "@st.rmu.edu.gh");
+                $emailVerified = $this->verifyStudentEmailAddress($testEmailAddress);
+                if (!empty($emailVerified)) {
+                    $emailID = $fname . "." . $mname . "-" . $lname;
+                    $testEmailAddress = strtolower($emailID . "@st.rmu.edu.gh");
+                    $emailVerified = $this->verifyStudentEmailAddress($testEmailAddress);
+                    if (!empty($emailVerified)) {
+                        return array(
+                            "success" => false,
+                            "message" => "Failed to create a student email address! Please contact the administrator."
+                        );
+                    }
+                }
+            }
+        }
+        return array(
+            "success" => true,
+            "message" => $testEmailAddress
+        );
+    }
+
+    private function verifyStudentEmailAddress($emailAddress): mixed
+    {
+        return $this->dm->getData(
+            "SELECT `app_number` FROM `student` WHERE `email` = :e",
+            array(":e" => $emailAddress)
+        );
+    }
+    public function addNewStudent($data)
+    {
+        $date_admitted = date("Y-m-d");
+
+        $query2 = "INSERT INTO `student` (`index_number`, `app_number`, `email`, `password`, `phone_number`, 
+                    `prefix`, `first_name`, `middle_name`, `last_name`, `suffix`, `gender`, `dob`, `nationality`, 
+                    `photo`, `marital_status`, `disability`, `date_admitted`, `term_admitted`, `stream_admitted`, 
+                    `fk_academic_year`, `fk_program`, `fk_class`, `fk_department`) 
+                    VALUES (:ix, :an, :ea, :pw, :pn, :px, :fn, :mn, :ln, :sx, :gd, :db, :nt, :pt, :ms, :ds, :da, :ta, :sa, :fkay, :fkpg, :fkcl, :fkdt)";
+        $params2 = array(
+            ":ix" => $data["index_number"],
+            ":an" => $data["app_number"],
+            ":ea" => $data["email_generated"],
+            ":pw" => $data["password"],
+            ":pn" => $data["phone_no1_code"] . $data["phone_no1"],
+            ":px" => ucfirst(strtolower($data["prefix"])),
+            ":fn" => ucfirst(strtolower($data["first_name"])),
+            ":mn" => ucfirst(strtolower($data["middle_name"])),
+            ":ln" => ucfirst(strtolower($data["last_name"])),
+            ":sx" => ucfirst(strtolower($data["suffix"])),
+            ":gd" => $data["gender"],
+            ":db" => $data["dob"],
+            ":nt" => ucfirst(strtolower($data["nationality"])),
+            ":pt" => $data["photo"],
+            ":ms" => $data["marital_status"],
+            ":ds" => $data["disability"],
+            ":da" => $date_admitted,
+            ":ta" => $data["term"],
+            ":sa" => $data["stream"],
+            ":fkay" => $data["academic_year"],
+            ":fkpg" => $data["program"],
+            ":fkcl" => $data["class"],
+            ":fkdt" => $data["department"]
+        );
+
+        $student = $this->dm->inputData($query2, $params2);
+        if (empty($student)) return array("success" => false, "message" => "Failed to create a student account for applicant!");
+        return array("success" => true);
+    }
+
+    private function emailApplicantEnrollmentStatus($data): mixed
+    {
+        //return $data;
+        $pmd = match ($data["pi"][0]["code"]) {
+            "BSC" => ["Bachelor of Science", "B.Sc."],
+            "DIPLOMA" => ["Diploma", "Diploma"],
+            "MSC" => ["Master of Science", "M.Sc."],
+            "MA" => ["Master of Art", "M.A."]
+        };
+
+        $dur_word = match ($data["pi"][0]["duration"]) {
+            '1' => 'One',
+            '2' => 'Two',
+            '3' => 'Three',
+            '4' => 'Four',
+            '5' => 'Five',
+            '6' => 'Six',
+            '7' => 'Seven',
+            '8' => 'Eight',
+            '9' => 'Nine',
+            '10' => 'Ten'
+        };
+
+        $email = $data["email_addr"];
+        $subject = "Enrollment to Regional Maritime University";
+        $message = "<p>Dear " . ucfirst(strtolower($data["prefix"])) . " " . ucfirst(strtolower($data["first_name"])) . " " . ucfirst(strtolower($data["last_name"])) . ",</p>";
+        $message .= "<p>You have been enrolled to Regional Maritime University to pursue ";
+        $message .= "a {$dur_word} ({$data["pi"][0]["duration"]}) {$data["pi"][0]["dur_format"]} ";
+        $message .= "{$pmd[0]} ({$pmd[1]}) programme in " . ucfirst(strtolower($data["pi"][0]["merit"])) . " in the Faculty of </p>";
+        $message .= ucfirst(strtolower($data["pi"][0]["faculty"])) . " of the University. </p>";
+        $message .= "<p><u><strong>Your student account details</strong></u></p>";
+        $message .= "<div>Index Number: <strong>{$data["index_number"]}</strong></div>";
+        $message .= "<div>Password: <strong>123@Password</strong> <span style='color: red'>(default)</span></div>";
+        $message .= "<p>Kindly visit the <a href='https://student.rmuictonline.com'><strong>Student Portal</strong></a> to register your courses for the semester.</p>";
+        $message .= "<p>Do not hesitate to contact <a href='mailto:admission@rmu.edu.gh'>admission@rmu.edu.gh</a> for any clarification.</p>";
+        $message .= "<p>Congratulations on your admission to the Regional Maritime University.</p>";
+        $message .= "<p>Thank you and warm regards.</p>";
+
+        $response = $this->expose->sendEmail($email, $subject, $message);
+        if (!empty($response) && is_int($response)) return 1;
+        return 0;
+    }
+
+    public function smsApplicantEnrollmentStatus($data): mixed
+    {
+        $to = $data["phone_no1_code"] . $data["phone_no1"];
+        $message = "Congratulations! Your enrollment to Regional Maritime University to pursue {$data["p"][0]["name"]} is completed. ";
+        $message .= "Kindly check your mail box for more details.";
+        $response = json_decode($this->expose->sendSMS($to, $message));
+        if (!$response->status) return 1;
+        return 0;
     }
 
     /**
@@ -1866,29 +2429,49 @@ class AdminController
      */
     public function enrollApplicant($appID, $progID): mixed
     {
-        if ($this->updateApplicationStatus($appID, "enrolled", 1)) {
+        //create index number from program and number of student that exists
+        $index_creation_rslt = $this->createUndergradStudentIndexNumber($appID, $progID);
+        if (!$index_creation_rslt["success"]) return $index_creation_rslt;
+        $indexCreation = $index_creation_rslt["message"];
+        //return $indexCreation;
 
-            //create index number from program and number of student that exists
-            $indexCreation = $this->createStudentIndexNumber($progID)["index_number"];
+        //create email address from applicant name
+        $email_generated_rslt = $this->createStudentEmailAddress($appID);
+        if (!$email_generated_rslt["success"]) return $email_generated_rslt;
+        $emailGenerated = $email_generated_rslt["message"];
+        //return $emailGenerated;
 
-            //create email address from applicant name
-            $appDetails = $this->dm->getData(
-                "SELECT * FROM `personal_information` WHERE `app_login` = :a",
-                array(":a" => $appID)
-            )[0];
+        $appDetails = $this->getApplicantContactInfo($appID)[0];
+        //return $appDetails;
+        if (!$appDetails) return array("success" => false, "message" => "Failed to fetch applicant's background information!");
+        //$appDetails = $app_details_rslt["message"];
 
-            // Save Data
-            $query = "INSERT INTO enrolled_applicants VALUES(`app_id`, `index_number`, `email_address`, `programme`, `first_name`, `middle_name`, `last_name`, `sex`, `dob`, `nationality`, `phone_number`)";
-            $params = array(
-                $appID, $indexCreation["index_number"], $appDetails["email_addr"], $indexCreation["programme"], $appDetails["first_name"], $appDetails["middle_name"], $appDetails["last_name"],
-                $appDetails["gender"], $appDetails["dob"], $appDetails["nationality"], $appDetails["phone_no1_code"] . $appDetails["phone_no1"]
-            );
-            $addStudent = $this->dm->inputData($query, $params);
-            if (!empty($addStudent)) return array("success" => true, "message" => "Applicant successfully enrolled!");;
-        }
-        return array("success" => false, "message" => "Failed to enroll applicant!");
+        $term_admitted = $this->getAdmissionPeriodYearsByID($this->getCurrentAdmissionPeriodID())[0]["intake"];
+        //return $term_admitted;
+
+        $password = password_hash("123@Password", PASSWORD_BCRYPT);
+        $data = array_merge(
+            ["email_generated" => $emailGenerated, "term" => $term_admitted, "password" => $password],
+            $indexCreation,
+            $appDetails
+        );
+        // return $data;
+
+        // Save Data
+        $add_student_result = $this->addNewStudent($data);
+        if (!$add_student_result["success"]) return $add_student_result;
+
+        $this->emailApplicantEnrollmentStatus($data);
+        $this->smsApplicantEnrollmentStatus($data);
+
+        $this->updateApplicationStatus($appID, "enrolled", 1);
+        return array("success" => true, "message" => "Applicant successfully enrolled!");
     }
 
+    public function getEnrolledApplicantDetailsByAppNum($app_number): mixed
+    {
+        return $this->dm->getData("SELECT * FROM `student` WHERE `app_number` = :a", array(":a" => $app_number));
+    }
 
     /**
      * For accounts officers
@@ -2245,7 +2828,7 @@ class AdminController
     public function verifyTransactionStatus($payMethod, $transID)
     {
         if ($payMethod == "CASH") return $this->verifyTransactionStatusFromDB($transID);
-        else return (new PaymentController())->verifyTransactionStatusFromOrchard($transID);
+        else return $this->pay->verifyTransactionStatusFromOrchard($transID);
     }
 
     public function prepareDownloadQuery($data)

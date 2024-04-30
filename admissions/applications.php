@@ -35,7 +35,9 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
 ?>
@@ -112,6 +114,13 @@ require_once('../inc/page-data.php');
                                     </span>
                                 </button>
 
+                                <button id="apps-awaiting" class="btn btn-outline-primary col toggle-output">
+                                    Awaiting
+                                    <span class="badge text-bg-secondary">
+                                        <?= isset($_GET["t"]) ? $admin->fetchTotalAwaitingResultsByFormType($_SESSION["admin_period"], $_GET["t"])[0]["total"] : ""; ?>
+                                    </span>
+                                </button>
+
                                 <button id="apps-in-progress" class="btn btn-outline-primary col me-2 toggle-output">
                                     In Progress
                                     <span class="badge text-bg-secondary">
@@ -133,10 +142,10 @@ require_once('../inc/page-data.php');
                                     </span>
                                 </button>
 
-                                <button id="apps-awaiting" class="btn btn-outline-primary col toggle-output">
-                                    Awaiting
+                                <button id="apps-enrolled" class="btn btn-outline-primary col me-2 toggle-output">
+                                    Enrolled
                                     <span class="badge text-bg-secondary">
-                                        <?= isset($_GET["t"]) ? $admin->fetchTotalAwaitingResultsByFormType($_SESSION["admin_period"], $_GET["t"])[0]["total"] : ""; ?>
+                                        <?= isset($_GET["t"]) ? $admin->fetchTotalEnrolledApplicants($_SESSION["admin_period"], $_GET["t"])[0]["total"] : ""; ?>
                                     </span>
                                 </button>
 

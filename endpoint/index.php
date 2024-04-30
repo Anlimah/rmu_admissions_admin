@@ -6,7 +6,7 @@ $_SESSION["currentAccess"] = time();
 
 $diff = $_SESSION["currentAccess"] - $_SESSION["lastAccessed"];
 
-if ($diff >  1800) die(json_encode(array("success" => false, "message" => "logout")));
+if ($diff >  1800) die(json_encode(array("success" => false, "message" => "Your session expired. Please refresh the page to continue!")));
 
 /*
 * Designed and programmed by
@@ -27,8 +27,10 @@ use Src\Controller\DownloadAllExcelDataController;
 use Src\Controller\UploadExcelDataController;
 use Src\Controller\ExposeDataController;
 
-$expose = new ExposeDataController();
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$expose = new ExposeDataController($db, $user, $pass);
+$admin = new AdminController($db, $user, $pass);
 
 $data = [];
 $errors = [];
@@ -82,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         if (!isset($_GET["adp_key"]) || empty($_GET["adp_key"])) {
             die(json_encode(array("success" => false, "message" => "Missing input field")));
         }
-        $rslt = $admin->fetchAdmissionPeriod($_GET["adp_key"]);
+        $rslt = $admin->fetchAdmissionPeriodByID($_GET["adp_key"]);
         if (!$rslt) die(json_encode(array("success" => false, "message" => "Error fetching admissions information!")));
         die(json_encode(array("success" => true, "message" => $rslt)));
     }
@@ -93,6 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
         $rslt = $admin->fetchSystemUser($_GET["user_key"]);
         if (!$rslt) die(json_encode(array("success" => false, "message" => "Error fetching user account information!")));
+        die(json_encode(array("success" => true, "message" => $rslt)));
+    }
+    //
+    elseif ($_GET["url"] == "programsByCategory") {
+        if (!isset($_GET["cert-type"]) || empty($_GET["cert-type"])) {
+            die(json_encode(array("success" => false, "message" => "Missing input field")));
+        }
+        $rslt = $admin->fetchAllFromProgramByCode($_GET["cert-type"]);
+        if (!$rslt) die(json_encode(array("success" => false, "message" => "Failed to fetch programs for this certificate category [{$_GET["cert-type"]}]!")));
         die(json_encode(array("success" => true, "message" => $rslt)));
     }
 
@@ -305,14 +316,15 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
     }
 
     //
-    elseif ($_GET["url"] == "getAllAdmittedApplicants") {
+    elseif ($_GET["url"] == "getAllEnrolledApplicants") {
 
-        if (!isset($_POST["cert-type"]))
+        if (!isset($_POST["cert-type"]) || !isset($_POST["prog-type"]))
             die(json_encode(array("success" => false, "message" => "Invalid input field")));
         if (empty($_POST["cert-type"]))
             die(json_encode(array("success" => false, "message" => "Missing input field")));
 
-        $result = $admin->getAllAdmittedApplicantsAllAll($_POST["cert-type"]);
+        //$result = $admin->getAllAdmittedApplicantsAllAll($_POST["cert-type"]);
+        $result = $admin->fetchAllEnrolledApplicantsData($_POST["cert-type"], $_POST["prog-type"]);
         if (empty($result)) die(json_encode(array("success" => false, "message" => "No result found!")));
         die(json_encode(array("success" => true, "message" => $result)));
     }
@@ -862,13 +874,32 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
     }
 
     // admit an applicant to a particular programme and generate admission letter
-    elseif ($_GET["url"] == "admit-individual-applicant") {
-        if (!isset($_POST["app-prog"]) || empty($_POST["app-prog"]))
-            die(json_encode(array("success" => false, "message" => "Please choose a programme!")));
-        if (!isset($_POST["app-login"]) || empty($_POST["app-login"]))
-            die(json_encode(array("success" => false, "message" => "There no match for this applicant in database!")));
+    elseif ($_GET["url"] == "program-availability") {
+        if (!isset($_POST["app-prog-check"]) || empty($_POST["app-prog-check"]))
+            die(json_encode(array("success" => false, "message" => "No program provided!")));
+        if (!isset($_POST["app-stream-check"]) || empty($_POST["app-stream-check"]))
+            die(json_encode(array("success" => false, "message" => "No application stream provided!")));
+        die(json_encode($admin->checkProgramStreamAvailability($_POST["app-prog-check"], $_POST["app-stream-check"])));
+    }
 
-        die(json_encode($admin->admitIndividualApplicant($_POST["app-login"], $_POST["app-prog"])));
+    // admit an applicant to a particular programme and generate admission letter
+    elseif ($_GET["url"] == "admit-individual-applicant") {
+        if (!isset($_POST["app-prog-id-check"]) || empty($_POST["app-prog-id-check"]))
+            die(json_encode(array("success" => false, "message" => "No program provided!")));
+
+        if (!isset($_POST["app-login-check"]) || empty($_POST["app-login-check"]))
+            die(json_encode(array("success" => false, "message" => "No match found for this applicant!")));
+
+        if (!isset($_POST["app-stream-check"]) || empty($_POST["app-stream-check"]))
+            die(json_encode(array("success" => false, "message" => "No stream provide for this applicant!")));
+
+        if (!isset($_POST["app-email-check"]))
+            die(json_encode(array("success" => false, "message" => "Choose an option to send email to applicant or not!")));
+
+        if (!isset($_POST["app-sms-check"]))
+            die(json_encode(array("success" => false, "message" => "Choose an option to send SMS to applicant or not!")));
+
+        die(json_encode($admin->admitIndividualApplicant($_POST["app-login-check"], $_POST["app-prog-id-check"], $_POST["app-stream-check"], $_POST["app-email-check"], $_POST["app-sms-check"])));
     }
 
     // decline applicant admission

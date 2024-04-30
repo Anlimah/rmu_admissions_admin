@@ -33,7 +33,9 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
 ?>
@@ -79,26 +81,22 @@ require_once('../inc/page-data.php');
                         <div class="card-body">
                             <h5 class="card-title">Declined Applicants</h5>
                             <form id="fetchDataForm" class="mb-4">
-                                <div class="row">
+                                <div class="row" style="justify-content: baseline; align-items: center">
                                     <div class="col-3">
-                                        <label for="cert-type" class="form-label">Certificate Type</label>
                                         <select name="cert-type" id="cert-type" class="form-select">
-                                            <option value="" hidden>Choose</option>
-                                            <option value="WASSCE">WASSCE</option>
-                                            <option value="SSSCE">SSSCE</option>
-                                            <option value="GBCE">GBCE</option>
-                                            <option value="NECO">NECO</option>
-                                            <option value="DIPLOMA">DIPLOMA</option>
-                                            <option value="DEGREE">DEGREE</option>
+                                            <option value="" hidden>Choose Category</option>
                                             <option value="MASTERS">MASTERS</option>
-                                            <option value="BACCALAUREATE">BACCALAUREATE</option>
-                                            <option value="O LEVEL">O LEVEL</option>
-                                            <option value="A LEVEL">A LEVEL</option>
-                                            <option value="OTHER">OTHER</option>
+                                            <option value="DEGREE">DEGREE</option>
+                                            <option value="DIPLOMA">DIPLOMA</option>
+                                            <option value="UPGRADERS">UPGRADERS</option>
+                                            <option value="MEM">MARINE ENGINE MECHANICS</option>
+                                            <option value="CDADILT">CILT, DILT AND ADILT</option>
                                         </select>
                                     </div>
-                                    <div class="col-2">
-                                        <button type="submit" class="btn mb-4 btn-primary" style="margin-top: 30px;" id="submitBtn">Fetch Data</button>
+                                    <div class="col-3" id="bs-masters-prog">
+                                        <select name="prog-type" id="prog-type" class="form-select" data-bs-programme="MASTERS">
+                                            <option value="" hidden>Choose Programme</option>
+                                        </select>
                                     </div>
                                 </div>
                             </form>

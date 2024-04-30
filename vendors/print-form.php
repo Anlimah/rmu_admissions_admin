@@ -36,11 +36,13 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 
 use Src\Controller\ExposeDataController;
 
-$expose = new ExposeDataController();
+$expose = new ExposeDataController($db, $user, $pass);
 
 $data = $expose->getApplicationInfo($_GET["exttrid"]);
 $vendor_info = $admin->fetchFullName($_SESSION["user"]);
