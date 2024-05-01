@@ -36,8 +36,10 @@ require_once('bootstrap.php');
 use Src\Controller\AdminController;
 use Src\Controller\UsersController;
 
-$admin = new AdminController();
-$user = new UsersController();
+require_once('inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
+$user = new UsersController($db, $user, $pass);
 
 $photo = $user->fetchApplicantPhoto($_GET['q']);
 $personal = $user->fetchApplicantPersI($_GET['q']);
@@ -600,7 +602,7 @@ $admin->updateApplicationStatus($_GET["q"], 'reviewed', 1);
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             window.print();
-            //window.close();
+            window.close();
         });
     </script>
 </body>

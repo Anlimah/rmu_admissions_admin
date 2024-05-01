@@ -16,16 +16,22 @@ class Broadsheet
     private $fileName = null;
     private $sheetTitle = null;
     private $cert_type = null;
+    private $admission_period = null;
     private $action = null;
 
-    public function __construct($cert_type, $action = "bs")
+    public function __construct($admission_period, $cert_type, $action = "bs")
     {
+        $db   = getenv('LOCAL_DB_ADMISSION_DATABASE');
+        $user = getenv('LOCAL_DB_ADMISSION_USERNAME');
+        $pass = getenv('LOCAL_DB_PASSWORD');
+
         $this->action = $action;
         $this->cert_type = $cert_type;
+        $this->admission_period = $admission_period;
         $this->spreadsheet = new Spreadsheet();
         $this->sheet = $this->spreadsheet->getActiveSheet();
         $this->writer = new Xlsx($this->spreadsheet);
-        $this->admin = new AdminController();
+        $this->admin = new AdminController($db, $user, $pass);
     }
 
     public function prepareBSData()
@@ -149,7 +155,7 @@ class Broadsheet
 
     public function createFileName($cert_type)
     {
-        $dateData = $this->admin->getAcademicPeriod();
+        $dateData = $this->admin->getAcademicPeriod($this->admission_period);
         $this->fileName = strtoupper("List of Admitted" . ($cert_type != "all" ? " $cert_type " : " ") . "Applicants");
         $academicIntake = $dateData[0]["start_year"] . " - " . $dateData[0]["end_year"] . " " . $dateData[0]["info"];
         $this->sheetTitle = $this->fileName . "(" . strtoupper($academicIntake) . ")";
@@ -177,6 +183,6 @@ class Broadsheet
     }
 }
 
-$broadsheet = new Broadsheet($_GET["a"], $_GET['c']);
+$broadsheet = new Broadsheet($_GET["p"], $_GET["a"], $_GET['c']);
 $file = $broadsheet->generateFile();
 $broadsheet->downloadFile($file);
