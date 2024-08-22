@@ -248,27 +248,34 @@ class ExposeDataController extends DatabaseMethods
         return $this->getData("SELECT * FROM `halls`");
     }
 
-    public function sendEmail($recipient_email, $subject, $message)
+    public function sendEmail($recipient_email, $subject, $message, $file_path = [])
     {
         //PHPMailer Object
         $mail = new PHPMailer(true); //Argument true in constructor enables exceptions
 
         //From email address and name
         $mail->From = "rmuicton@rmuictonline.com";
-        $mail->FromName = "rmuicton";
+        $mail->FromName = "Regional Maritime University";
 
         //To address and name
         $mail->addAddress($recipient_email);
 
         //Send HTML or Plain Text email
         $mail->isHTML(true);
-
         $mail->Subject = $subject;
         $mail->Body = $message;
+
+        // Add attachment if file path is provided
+        if (!empty($file_path)) {
+            foreach ($file_path as $path) {
+                $mail->addAttachment($path);
+            }
+        }
 
         try {
             if ($mail->send()) return 1;
         } catch (Exception $e) {
+            throw new Exception("Mailer Error: " . $mail->ErrorInfo, 1);
             return "Mailer Error: " . $mail->ErrorInfo;
         }
         return 0;
@@ -301,12 +308,6 @@ class ExposeDataController extends DatabaseMethods
         return $response;
     }
 
-    public function getVendorPhone($vendor_id)
-    {
-        $sql = "SELECT `country_code`, `phone_number` FROM `vendor_details` WHERE `id`=:i";
-        return $this->getData($sql, array(':i' => $vendor_id));
-    }
-
     public function getVendorPhoneByUserID($user_id)
     {
         $sql = "SELECT v.`id`, v.`phone_number` FROM `vendor_details` AS v, `sys_users` AS u 
@@ -318,20 +319,6 @@ class ExposeDataController extends DatabaseMethods
     {
         $str = "SELECT `id` FROM `vendor_details` WHERE `id`=:i";
         return $this->getID($str, array(':i' => $vendor_id));
-    }
-
-    public function verifyVendorLogin($username, $password)
-    {
-        $sql = "SELECT `vendor`, `password` FROM `vendor_login` WHERE `user_name` = :u";
-        $data = $this->getData($sql, array(':u' => sha1($username)));
-        if (!empty($data)) {
-            if (password_verify($password, $data[0]["password"])) {
-                return array("success" => true, "message" => $data[0]["vendor"]);
-            } else {
-                return array("success" => false, "message" => "No match found!");
-            }
-        }
-        return array("success" => false, "message" => "User does not exist!");
     }
 
     public function getApplicationInfo($transaction_id)

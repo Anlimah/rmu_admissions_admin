@@ -17,10 +17,14 @@ class UploadExcelDataController
 
     public function __construct($fileObj, $startRow, $endRow)
     {
+        $db   = getenv('DB_ADMISSION_DATABASE');
+        $user = getenv('DB_ADMISSION_USERNAME');
+        $pass = getenv('DB_PASSWORD');
+
         $this->fileObj = $fileObj;
         $this->startRow = (int) $startRow;
         $this->endRow = (int) $endRow;
-        $this->dm = new DatabaseMethods();
+        $this->dm = new DatabaseMethods($db, $user, $pass);
     }
 
     public function saveDataFile()

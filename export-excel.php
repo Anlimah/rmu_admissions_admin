@@ -1,7 +1,5 @@
 <?php
 
-use Src\Controller\AdminController;
-
 session_start();
 
 //if (!isset($_SESSION["admin_user"])) header("Location: index.php");
@@ -16,7 +14,11 @@ if (!isset($_GET["w"])) {
 
 require_once "./bootstrap.php";
 
-$admin = new AdminController();
+use Src\Controller\AdminController;
+
+require_once('inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 
 $result = array();
 $title_var = "";

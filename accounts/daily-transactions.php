@@ -32,8 +32,9 @@ $_SESSION["lastAccessed"] = time();
 require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
+require_once('../inc/admin-database-con.php');
 
-$admin = new AdminController();
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
 $adminSetup = true;

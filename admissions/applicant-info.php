@@ -37,8 +37,10 @@ require_once('../inc/page-data.php');
 use Src\Controller\AdminController;
 use Src\Controller\UsersController;
 
-$admin = new AdminController();
-$user = new UsersController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
+$user = new UsersController($db, $user, $pass);
 
 $photo = $user->fetchApplicantPhoto($_GET['q']);
 $personal = $user->fetchApplicantPersI($_GET['q']);
@@ -211,22 +213,46 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                                                     <td style="padding: 4px 8px !important">
                                                         <?php
                                                         if (!empty($app_statuses)) {
-                                                            if ($app_statuses[0]["declined"]) { ?>
-                                                                <span class="badge rounded-pill text-bg-danger">DECLINED</span>
+                                                            if ($app_statuses[0]["enrolled"]) { ?>
+                                                                <span class="badge rounded-pill text-bg-primary">ENROLLED</span>
                                                             <?php } else if ($app_statuses[0]["admitted"]) { ?>
                                                                 <span class="badge rounded-pill text-bg-success">ADMITTED</span>
+                                                            <?php } else if ($app_statuses[0]["declined"]) { ?>
+                                                                <span class="badge rounded-pill text-bg-danger">DECLINED</span>
                                                             <?php } else if ($app_statuses[0]["reviewed"]) { ?>
                                                                 <span class="badge rounded-pill text-bg-warning">REVIEWED</span>
-                                                            <?php } else if ($app_statuses[0]["reviewed"]) { ?>
-                                                                <span class="badge rounded-pill text-bg-primary">ENROLLED</span>
                                                         <?php }
                                                         }
                                                         ?>
                                                     </td>
+                                                    <td style="padding: 4px 8px !important; display:flex; justify-content:flex-end;">
+                                                        <?php if (!empty($app_statuses) && $app_statuses[0]["admitted"]) { ?>
+                                                            <?php if (!$app_statuses[0]["enrolled"]) { ?>
+                                                                <form method="post" style="width:100px;" id="enrollAppForm">
+                                                                    <button class="btn btn-outline-success btn-xs" id="enroll-app-check" style="width:100%;" type="submit">
+                                                                        <span class="bi bi-check2-square"></span> <b id="enrollAppBtn-text">Enroll</b>
+                                                                    </button>
+                                                                    <input type="hidden" name="app-login" id="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
+                                                                    <input type="hidden" name="app-prog" value="<?= !empty($app_statuses[0]["programme_awarded"]) ? $app_statuses[0]["programme_awarded"] : 0  ?>">
+                                                                </form>
+                                                            <?php } ?>
+                                                            <?php if ($app_statuses[0]["enrolled"]) { ?>
+                                                                <form method="post" style="width:100px;" id="sendFilesForm">
+                                                                    <input type="file" name="send-files" id="send-files" multiple style="display: none;">
+                                                                    <button class="btn btn-outline-dark btn-xs" id="send-files-check" style="width:100%" for="send-files">
+                                                                        <span class="bi bi-file-text"></span> <b id="sendBtn-text">Send Files</b>
+                                                                    </button>
+                                                                    <input type="hidden" name="app-login" id="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
+                                                                    <input type="hidden" name="programme-awarded" id="programme-awarded" value="<?= !empty($app_statuses[0]["programme_awarded"]) ? $app_statuses[0]["programme_awarded"] : 0  ?>">
+                                                                </form>
+                                                            <?php } ?>
+                                                        <?php } ?>
+                                                    </td>
                                                 </tr>
+
                                                 <tr>
                                                     <td style="width: 100px; padding: 4px 8px !important"><b>PROGRAMME:</b> </td>
-                                                    <td style="padding: 4px 8px !important">
+                                                    <td style="padding: 4px 8px !important" colspan="2">
                                                         <?php
                                                         if (!empty($app_statuses)) {
                                                             if ($app_statuses[0]["programme_awarded"]) { ?>
@@ -238,26 +264,22 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                                                         ?>
                                                     </td>
                                                 </tr>
+
+                                                <?php if (!empty($app_statuses) && $app_statuses[0]["enrolled"]) { ?>
+                                                    <tr>
+                                                        <td style="width: 100px; padding: 4px 8px !important"><b>INDEX No.:</b> </td>
+                                                        <td style="padding: 4px 8px !important" colspan="2">
+                                                            <?php
+                                                            $student = $admin->getEnrolledApplicantDetailsByAppNum($app_number[0]["app_number"]);
+                                                            if (!empty($student)) { ?>
+                                                                <span><?= $student[0]["index_number"] ?></span>
+                                                            <?php } else { ?>
+                                                                <span>N/A</span>
+                                                            <?php } ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php } ?>
                                             </table>
-                                            <div style="flex-grow: 4;">
-                                                <div style="display: flex; flex-direction:column; justify-content: flex-start;">
-                                                    <form method="post" style="width:100px;" id="enrollAppForm">
-                                                        <button class="btn btn-outline-success btn-xs" id="enroll-app-check" style="width:100%;" type="submit">
-                                                            <span class="bi bi-check2-square"></span> <b id="enrollAppBtn-text">Enroll</b>
-                                                        </button>
-                                                        <input type="hidden" name="app-login" id="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
-                                                        <input type="hidden" name="app-prog" value="<?= !empty($app_statuses[0]["programme_awarded"]) ? $app_statuses[0]["programme_awarded"] : 0  ?>">
-                                                    </form>
-                                                    <form method="post" style="width:100px; margin-top: 10px" id="sendFilesForm">
-                                                        <input type="file" name="send-files" id="send-files" multiple style="display: none;">
-                                                        <label class="btn btn-outline-dark btn-xs" id="send-files-check" style="width:100%" for="send-files">
-                                                            <span class="bi bi-file-text"></span> <b id="sendBtn-text">Send Files</b>
-                                                        </label>
-                                                        <input type="hidden" name="app-login" id="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
-                                                        <input type="hidden" name="programme-awarded" id="programme-awarded" value="<?= !empty($app_statuses[0]["programme_awarded"]) ? $app_statuses[0]["programme_awarded"] : 0  ?>">
-                                                    </form>
-                                                </div>
-                                            </div>
                                         </div>
                                         <div style="display: flex; justify-content: flex-end; padding: 15px; border-radius:15px">
                                             <a style="width: 100px" class="btn btn-primary btn-sm" target="_blank" href="../download-appData.php?<?= "t=" . $_GET["t"] . "&q=" . $_GET["q"] ?>">
@@ -285,6 +307,7 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                                 <div class="col">
                                     <div style="display: flex;">
                                         <div style="display: flex; flex-direction: column">
+                                            <!-- Personal Information -->
                                             <div class="col">
                                                 <h3>Personal Information</h3>
                                                 <div>
@@ -359,7 +382,7 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                                                 </div>
                                             </div>
 
-
+                                            <!-- Guardian/Parent Information -->
                                             <div class="col" style="margin-top: 25px">
                                                 <h3>Guardian/Parent Information</h3>
                                                 <div>
@@ -560,11 +583,7 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
 
                                 <div class="col" style="margin-top:100px">
                                     <div style="display: flex; justify-content: space-around">
-                                        <form method="post" id="admit-applicant-form" class="mb-2">
-                                            <input type="hidden" name="app-prog" id="app-prog">
-                                            <input type="hidden" name="app-login" id="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
-                                            <button class="btn btn-success" type="submit" style="min-width: 200px;">Admit</button>
-                                        </form>
+                                        <button class="btn btn-success" id="app-application-check-btn" type="button" style="min-width: 200px;" data-bs-toggle="modal" data-bs-target="#admissionSummary">Admit</button>
                                         <form method="post" id="decline-applicant-form">
                                             <input type="hidden" name="app-login" value="<?= $personal_AB[0]["app_login"] ?>">
                                             <button class="btn btn-danger" type="submit" style="min-width: 200px;">Decline</button>
@@ -600,6 +619,82 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
             </div>
         </div>
 
+
+        <!-- Admission Summary Modal -->
+        <div class="modal fade" id="admissionSummary" tabindex="-1" aria-labelledby="admissionSummaryLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="admissionSummaryLabel">Summary</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="admit-applicant-form">
+                            <div class="row mb-3">
+                                <label for="recipient-name" class="col-sm-4 col-form-label"> Application: </label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="app-app-number-check" id="" class="form-control form-control-sm" value="<?= $app_number[0]["app_number"] ?> (<?= $personal_AB[0]["study_stream"] ?>)" style="font-weight: bolder; border: none !important" disabled>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label for="message-text" class="col-sm-4 col-form-label">Program Applying: </label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="app-prog-check" id="app-prog-check" class="form-control form-control-sm" style="font-weight: bolder; border: none !important" disabled>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label for="message-text" class="col-sm-4 col-form-label">Stream Availability: </label>
+                                <div class="row col-sm-8">
+                                    <input type="text" name="app-prog-availability-check" id="app-prog-availability-check" class="col-3 form-control form-control-sm" style="font-weight: bolder; border: none !important; width: 10px" disabled>
+                                    <span id="app-prog-availability-check-msg" class="col-9"></span>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label for="message-text" class="col-sm-4 col-form-label"> Stream Applying: </label>
+                                <div class="col-sm-8">
+                                    <select name="app-stream-check" id="app-stream-check" class="form-select form-select-sm" style="font-weight: bolder; width:150px">
+                                        <option value=" REGULAR" <?= strtolower($personal_AB[0]["study_stream"]) === "regular" ? "selected" : "" ?>>REGULAR</option>
+                                        <option value="WEEKEND" <?= strtolower($personal_AB[0]["study_stream"]) === "weekend" ? "selected" : "" ?>>WEEKEND</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label for="message-text" class="col-sm-4 col-form-label">Email Admission Letter: </label>
+                                <div class="col-sm-8">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="app-email-check" id="app-email-check-yes" value="1" checked>
+                                        <label class="form-check-label" for="app-email-check-yes">Yes</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="app-email-check" id="app-email-check-no" value="0">
+                                        <label class="form-check-label" for="app-email-check-no">No</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label for="message-text" class="col-sm-4 col-form-label">Notify Applicant (SMS):</label>
+                                <div class="col-sm-8">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="app-sms-check" id="app-sms-check-yes" value="1" checked>
+                                        <label class="form-check-label" for="app-sms-check-yes">Yes</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="app-sms-check" id="app-sms-check-no" value="0">
+                                        <label class="form-check-label" for="app-sms-check-no">No</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="app-prog-id-check" id="app-prog-id-check">
+                            <input type="hidden" name="app-login-check" id="app-login-check" value="<?= $personal_AB[0]["app_login"] ?>">
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success" style="min-width: 200px;" id="admit-applicant-btn">Admit</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main><!-- End #main -->
 
     <?= require_once("../inc/footer-section.php") ?>
@@ -619,7 +714,6 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                 return vars;
             }
 
-            //Use a default value when param is missing
             function getUrlParam(parameter, defaultvalue) {
                 var urlparameter = defaultvalue;
                 if (window.location.href.indexOf(parameter) > -1) {
@@ -656,19 +750,63 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                 }
             });
 
-
             $(".app-prog-admit").on("click", function() {
                 let prog = $(this).val();
-                $("#app-prog").val(prog);
+                $("#app-prog, #app-prog-check").val(prog);
             });
 
             $("#admit-other-prog").change("blur", function() {
                 let prog = $(this).val();
-                $("#app-prog").val(prog);
+                $("#app-prog, #app-prog-check").val(prog);
+            });
+
+            function checkStreamAvailability(data) {
+                $.ajax({
+                    type: "POST",
+                    url: "../endpoint/program-availability",
+                    data: data,
+                    success: function(result) {
+                        console.log(result);
+                        if (result.message == "logout") {
+                            window.location.href = "?logout=true";
+                            return;
+                        } else {
+                            result.success ? $("#admit-applicant-btn").fadeIn(1000) : $("#admit-applicant-btn").fadeOut(1000)
+                            $("#app-prog-id-check").val(result.data);
+                            $("#app-prog-availability-check-msg").text(result.message);
+                            $("#app-prog-availability-check").attr("class", result.success ? "col-3 form-control form-control-sm bg-success" : "col-3 form-control form-control-sm bg-danger");
+                            $("#app-prog-availability-check-msg").attr("class", result.success ? "col-9 text-success" : "col-9 text-danger");
+                        }
+                    },
+                    error: function(error) {
+                        console.log(error);
+                    }
+                });
+            }
+
+            $("#app-application-check-btn").on("click", function() {
+                data = {
+                    "app-prog-check": $("#app-prog-check").val().trim(),
+                    "app-stream-check": $("#app-stream-check").val().trim()
+                }
+                checkStreamAvailability(data);
+            });
+
+            $("#app-stream-check").change("blur", function() {
+                data = {
+                    "app-prog-check": $("#app-prog-check").val().trim(),
+                    "app-stream-check": $("#app-stream-check").val().trim()
+                }
+                checkStreamAvailability(data);
+            })
+
+            $("#admit-applicant-btn").on("click", function() {
+                $("#admit-applicant-form").submit();
             });
 
             $("#admit-applicant-form").on("submit", function(e) {
                 e.preventDefault();
+
                 var c = confirm("Are you sure you want to admit this applicant?");
                 if (c) {
                     $.ajax({
@@ -680,8 +818,13 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                         processData: false,
                         success: function(result) {
                             console.log(result);
-                            if (result.message == "logout") window.location.href = "?logout=true";
-                            else alert(result.message);
+                            if (!result.success && result.message == "logout") {
+                                window.location.href = "?logout=true";
+                                return;
+                            } else {
+                                alert(result.message);
+                                if (result.success) window.location.reload();
+                            }
                         },
                         error: function(error) {
                             console.log(error);
@@ -800,19 +943,19 @@ $app_statuses = $admin->fetchApplicationStatus($_GET['q']);
                     processData: false,
                     success: function(result) {
                         console.log(result);
-                        if (result.message == "logout") {
+                        if (!result.success && result.message == "logout") {
                             window.location.href = "?logout=true";
                             return;
+                        } else {
+                            alert(result.message);
+                            $("#enrollAppBtn-text").text("Enroll");
+                            if (result.success) window.location.reload();
                         }
-                        alert(result.message);
                     },
                     error: function(error) {
                         console.log(error);
                     }
                 });
-                setTimeout(function() {
-                    $("#sendBtn-text").text("Enroll");
-                }, 1000);
             })
 
         });

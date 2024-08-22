@@ -33,7 +33,9 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
 ?>
@@ -74,7 +76,6 @@ require_once('../inc/page-data.php');
                             <form id="fetchDataForm" class="mb-4">
                                 <div class="row" style="justify-content: baseline; align-items: center">
                                     <div class="col-3">
-                                        <!--<label for="cert-type" class="form-label">Certificate Type</label>-->
                                         <select name="cert-type" id="cert-type" class="form-select">
                                             <option value="" hidden>Choose Category</option>
                                             <option value="MASTERS">MASTERS</option>
@@ -85,15 +86,11 @@ require_once('../inc/page-data.php');
                                             <option value="CDADILT">CILT, DILT AND ADILT</option>
                                         </select>
                                     </div>
-                                    <!--<div class="col-3" style="display: none;" id="bs-masters-prog">
-                                        <label for="cert-type" class="form-label">Certificate Type</label>
-                                    <select name="cert-type" id="cert-type" class="form-select" data-bs-programme="MASTERS">
-                                        <option value="" hidden>Choose Programme</option>
-                                    </select>
-                                </div>
-                                <div class="col-3 mt-4">
-                                    <button type="submit" class="btn mb-4 btn-outline-primary">Fetch Data</button>
-                                </div>-->
+                                    <div class="col-3" id="bs-masters-prog">
+                                        <select name="prog-type" id="prog-type" class="form-select" data-bs-programme="MASTERS">
+                                            <option value="" hidden>Choose Programme</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </form>
                             <div id="info-output"></div>
@@ -210,7 +207,7 @@ require_once('../inc/page-data.php');
                     success: function(result) {
                         console.log(result);
                         if (result.success) {
-                            if (data["cert-type"] == "DIPLOMA" || data["cert-type"] == "DEGREE") {
+                            /*if (data["cert-type"] == "DIPLOMA" || data["cert-type"] == "DEGREE") {
                                 $("#wassce-apps").html('');
                                 $.each(result.message, function(index, value) {
                                     $("#wassce-apps").append(
@@ -248,7 +245,22 @@ require_once('../inc/page-data.php');
                                     );
                                 });
                                 $(".postgrad-apps").show();
-                            }
+                            }*/
+                            $("#postgrad-apps").html('');
+                            $.each(result.message, function(index, value) {
+                                $("#postgrad-apps").append(
+                                    '<tr>' +
+                                    '<th scope="row">' + (index + 1) + '</th>' +
+                                    '<td>' + value.full_name + '</td>' +
+                                    '<td>' + value.age + '</td>' +
+                                    '<td>' + value.sex + '</td>' +
+                                    '<td>' + value.academic_background + '</td>' +
+                                    '<td>' + value.nationality + '</td>' +
+                                    '<td>' + value.first_prog + '</td>' +
+                                    '</tr>'
+                                );
+                            });
+                            $(".postgrad-apps").show();
                             $("#down-bs").show();
                         } else {
                             if (result.message == "logout") {

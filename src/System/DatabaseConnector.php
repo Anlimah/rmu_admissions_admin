@@ -2,28 +2,34 @@
 
 namespace Src\System;
 
+use Exception;
+use PDO;
+use PDOException;
+
 class DatabaseConnector
 {
-
     private $conn = null;
 
-    public function __construct()
+    public function __construct($db, $user, $pass)
     {
         $host = getenv('DB_HOST');
         $port = getenv('DB_PORT');
-        $db   = getenv('DB_DATABASE');
-        $user = getenv('DB_USERNAME');
-        $pass = getenv('DB_PASSWORD');
-
+        $dsn = "mysql:host=$host;port=$port;charset=utf8mb4;dbname=$db";
         try {
-            $this->conn = new \PDO("mysql:host=$host;port=$port;charset=utf8mb4;dbname=$db", $user, $pass);
-            $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-        } catch (\PDOException $e) {
-            exit($e->getMessage());
+            $this->conn = new PDO($dsn, $user, $pass, [
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            exit(json_encode(array("error" => $e->getMessage())));
+        } catch (Exception $s) {
+            http_response_code(401);
+            exit(json_encode(array("error" => $s->getMessage())));
         }
     }
 
-    public function getConnection()
+    public function connect()
     {
         return $this->conn;
     }

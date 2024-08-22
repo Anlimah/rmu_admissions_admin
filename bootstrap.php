@@ -8,3 +8,4 @@ $dotenv->load();
 
 define("ROOT_DIR", dirname(__FILE__));
 define("UPLOAD_DIR", ROOT_DIR . "/uploads/");
+define("VENDOR_AUTO_PATH", "vendor" . DIRECTORY_SEPARATOR . "dompdf");

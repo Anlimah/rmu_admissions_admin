@@ -15,7 +15,11 @@ class Broadsheet
 
     public function __construct($admin_period)
     {
-        $this->admin = new AdminController();
+        $db   = getenv('LOCAL_DB_ADMISSION_DATABASE');
+        $user = getenv('LOCAL_DB_ADMISSION_USERNAME');
+        $pass = getenv('LOCAL_DB_PASSWORD');
+
+        $this->admin = new AdminController($db, $user, $pass);
         $this->admin_period = $admin_period;
     }
 

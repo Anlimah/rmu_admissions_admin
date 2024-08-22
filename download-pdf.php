@@ -18,7 +18,9 @@ use Src\Controller\AdminController;
 
 require_once "./bootstrap.php";
 
-$admin = new AdminController();
+require_once('inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 
 $result = array();
 $title_var = "";
@@ -26,8 +28,12 @@ $title_var = "";
 switch ($_GET["w"]) {
     case 'apps':
         $data = array('action' => $_GET["a"], 'country' => $_GET["c"], 'type' => $_GET["t"], 'program' => $_GET["p"]);
-        $result = $admin->fetchAppsSummaryData($data);
+        $result = $admin->fetchAppsSummaryData($_SESSION["admin_period"], $data);
         switch ($data["action"]) {
+            case 'apps-total':
+                $title_var = "all";
+                break;
+
             case 'apps-submitted':
                 $title_var = "Submitted";
                 break;
@@ -47,12 +53,22 @@ switch ($_GET["w"]) {
             case 'apps-awaiting':
                 $title_var = "awaiting";
                 break;
+
+            case 'apps-enrolled':
+                $title_var = "enrolled";
+                break;
         }
         break;
+
     case 'pdfFileDownload':
         $result = $admin->executeDownloadQuery();
         unset($_SESSION["downloadQuery"]);
         break;
+
+    case 'excelFileDownload':
+        echo "Excel";
+        break;
+
     case 'excelFileDownload':
         echo "Excel";
         break;
@@ -67,7 +83,7 @@ switch ($_GET["w"]) {
 </head>
 
 <div>
-    <h2 style="text-align: center;" class="m-4">List of all <?= $title_var ?> Applications</h2>
+    <h2 style="text-align: center;" class="m-4">List of <?= $title_var ?> Applicants</h2>
     <table class="table table-borderless datatable table-striped table-hover" style="font-size: 12px;">
         <?php if ($_GET["w"] == 'pdfFileDownload') { ?>
             <thead class="table-secondary">
@@ -96,7 +112,7 @@ switch ($_GET["w"]) {
                     </tr>
                 <?php } ?>
             </tbody>
-        <?php } else { ?>
+        <?php } else if ($_GET["w"] == 'apps') { ?>
             <thead class="table-dark">
                 <tr>
                     <th scope="col">#</th>
@@ -116,6 +132,31 @@ switch ($_GET["w"]) {
                         <td><?= $ft["app_type"] ?></td>
                         <td><?= $ft["first_prog"] ?></td>
                         <td><?= $ft["second_prog"] ?></td>
+                    </tr>
+                <?php } ?>
+            </tbody>
+        <?php } else if ($_GET["w"] == 'students') { ?>
+            <thead>
+                <tr class="table-dark">
+                    <th scope="col">#</th>
+                    <th scope="col">Index No.</th>
+                    <th scope="col">Full Name</th>
+                    <th scope="col">Programme</th>
+                    <th scope="col">Application Term</th>
+                    <th scope="col">Study Stream</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $index = 0;
+                foreach ($result as $ft) { ?>
+                    <tr>
+                        <th scope="row"> <?= $index + 1 ?></th>
+                        <td> <?= $ft["index_number"] ?></td>
+                        <td> <?= $ft["full_name"] ?></td>
+                        <td> <?= $ft["program_name"] ?></td>
+                        <td> <?= $ft["term_admitted"] ?></td>
+                        <td> <?= $ft["stream_admitted"] ?></td>
                     </tr>
                 <?php } ?>
             </tbody>

@@ -10,10 +10,10 @@ class UsersController
     private $dm;
     private $expose;
 
-    public function __construct()
+    public function __construct($db, $user, $pass)
     {
-        $this->dm = new DatabaseMethods();
-        $this->expose = new ExposeDataController();
+        $this->dm = new DatabaseMethods($db, $user, $pass);
+        $this->expose = new ExposeDataController($db, $user, $pass);
     }
 
     public function verifyEmailAddress($email, $code)

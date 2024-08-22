@@ -33,10 +33,12 @@ require_once('../bootstrap.php');
 
 use Src\Controller\AdminController;
 
-$admin = new AdminController();
+require_once('../inc/admin-database-con.php');
+
+$admin = new AdminController($db, $user, $pass);
 require_once('../inc/page-data.php');
 
-$vendor_id = isset($_SESSION["vendor_id"]) ? (int) $_SESSION["vendor_id"] : "";
+$vendor_id = (int) isset($_SESSION["vendor_id"]) ? $_SESSION["vendor_id"] : "";
 $vendorData = $admin->fetchVendor($vendor_id);
 if (!empty($vendorData) && !empty($vendorData[0]["api_user"])) {
     $_SESSION["api_user"] = $vendorData[0]["api_user"];

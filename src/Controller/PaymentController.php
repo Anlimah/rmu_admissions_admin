@@ -9,9 +9,9 @@ class PaymentController
 {
     private $voucher;
 
-    public function __construct()
+    public function __construct($db, $user, $pass)
     {
-        $this->voucher = new VoucherPurchase();
+        $this->voucher = new VoucherPurchase($db, $user, $pass);
     }
 
     public function vendorPaymentProcess($data)
