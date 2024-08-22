@@ -2954,4 +2954,23 @@ class AdminController
         header("Content-disposition:attachment;filename=\"" . basename($file_url) . "\"");
         readfile($file_url);
     }
+
+    public function verifyInternationalApplicantRefNumber(string $ref_number)
+    {
+        $query = "SELECT ffp.*, f.`name`, f.`amount`, ap.`info` FROM `foreign_form_purchase_requests` AS ffp, forms AS f, admission_period AS ap 
+        WHERE ffp.`reference_number` = :r AND f.id = ffp.form AND ap.id = ffp.admission_period";
+        return $this->dm->getData($query, array(":r" => $ref_number));
+    }
+
+    public function updateForiegnPurchaseStatus(string $ref_number, string $app_number)
+    {
+        $query = "UPDATE `foreign_form_purchase_requests` SET `app_number` = :an WHERE `reference_number` = :rn";
+        return $this->dm->inputData($query, array(":an" => $app_number, ":rn" => $ref_number));
+    }
+
+    public function fetchForeignAppDetailsAppNumber(string $app_number)
+    {
+        $query = "SELECT id FROM `purchase_detail` WHERE `app_number` = :an";
+        return $this->dm->inputData($query, array(":an" => $app_number));
+    }
 }

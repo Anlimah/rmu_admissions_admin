@@ -275,6 +275,54 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
     }
 
+    // International student ref number verification
+    elseif ($_GET["url"] == "ref-number-verify") {
+        if (isset($_SESSION["_foreignFormToken"]) && !empty($_SESSION["_foreignFormToken"]) && isset($_POST["_FFToken"]) && !empty($_POST["_FFToken"]) && $_POST["_FFToken"] == $_SESSION["_foreignFormToken"]) {
+
+            if (!isset($_POST["ref_number"]) || empty($_POST["ref_number"])) {
+                die(json_encode(array("success" => false, "message" => "Reference Number is required!")));
+            }
+
+            $ref_number = $expose->validateText($_POST["ref_number"]);
+            $result = $admin->verifyInternationalApplicantRefNumber($ref_number);
+            if (empty($result)) die(json_encode(array("success" => false, "message" => "No match found for provided reference number!")));
+
+            if (isset($result[0]["app_number"]) && !empty($result[0]["app_number"])) {
+                $data = $admin->fetchForeignAppDetailsAppNumber($result[0]["app_number"]);
+                die(json_encode(array("success" => true, "exttrid" => $data[0]["id"], "message" => "Transaction succeeded!")));
+            } else {
+                $_SESSION["vendorData"] = array(
+                    "first_name" => $result[0]["first_name"],
+                    "last_name" => $result[0]["last_name"],
+                    "country_name" => $result[0]["p_country_name"],
+                    "country_code" => $result[0]["p_country_code"],
+                    "phone_number" => $result[0]["phone_number"],
+                    "email_address" => $result[0]["email_address"],
+                    "form_id" => $result[0]["form"],
+                    "pay_method" => "CASH",
+                    "amount" => $result[0]["amount"],
+                    "vendor_id" => $_SESSION["vendor_id"],
+                    "admin_period" => $_SESSION["admin_period"],
+                    "ref_number" => $ref_number
+                );
+
+                if (!$expose->vendorExist($_SESSION["vendorData"]["vendor_id"])) {
+                    die(json_encode(array("success" => false, "message" => "Process can only be performed by a vendor!")));
+                }
+                $res = $admin->processVendorPay($_SESSION["vendorData"]);
+                if (!empty($res) && isset($res['success']) && $res["success"] == true) {
+                    if (isset($res["exttrid"]) && !empty($res["exttrid"])) {
+                        $admin->updateForiegnPurchaseStatus($ref_number, $res["app_number"]);
+                    }
+                    unset($res["app_number"]);
+                    die(json_encode($res));
+                }
+            }
+        } else {
+            die(json_encode(array("success" => false, "message" => "Invalid request!")));
+        }
+    }
+
     //
     elseif ($_GET["url"] == "apps-data") {
         if (!isset($_POST["action"]) || !isset($_POST["form_t"])) die(json_encode(array("success" => false, "message" => "Invalid input!")));
@@ -516,9 +564,17 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
 
         $user_data = array(
-            "first_name" => $_POST["v-name"], "last_name" => "MAIN", "user_name" => $_POST["v-email"], "user_role" => "Vendors",
-            "user_type" => "user", "vendor_company" => $_POST["v-name"], "company_code" => $_POST["v-code"], "vendor_role" => "Ops Head",
-            "vendor_phone" => $_POST["v-phone"], "vendor_branch" => "MAIN", "api_user" => ($_POST["v-api-user"] == "YES" ? 1 : 0)
+            "first_name" => $_POST["v-name"],
+            "last_name" => "MAIN",
+            "user_name" => $_POST["v-email"],
+            "user_role" => "Vendors",
+            "user_type" => "user",
+            "vendor_company" => $_POST["v-name"],
+            "company_code" => $_POST["v-code"],
+            "vendor_role" => "Ops Head",
+            "vendor_phone" => $_POST["v-phone"],
+            "vendor_branch" => "MAIN",
+            "api_user" => ($_POST["v-api-user"] == "YES" ? 1 : 0)
         );
 
         $privileges = array("select" => 1, "insert" => 1, "update" => 0, "delete" => 0);
@@ -668,10 +724,14 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
 
         $user_data = array(
-            "first_name" => $_POST["user-fname"], "last_name" => $_POST["user-lname"],
-            "user_name" => $_POST["user-email"], "user_role" => $_POST["user-role"],
-            "user_type" => $_POST["user-type"], "vendor_company" => $_POST["vendor-company"],
-            "vendor_tin" => $_POST["vendor-tin"], "vendor_phone" => $_POST["vendor-phone"],
+            "first_name" => $_POST["user-fname"],
+            "last_name" => $_POST["user-lname"],
+            "user_name" => $_POST["user-email"],
+            "user_role" => $_POST["user-role"],
+            "user_type" => $_POST["user-type"],
+            "vendor_company" => $_POST["vendor-company"],
+            "vendor_tin" => $_POST["vendor-tin"],
+            "vendor_phone" => $_POST["vendor-phone"],
             "vendor_address" => $_POST["vendor-address"]
         );
 

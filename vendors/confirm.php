@@ -174,6 +174,39 @@ $data = isset($_GET["exttrid"]) ? $expose->getApplicationInfo($_GET["exttrid"]) 
             <div class="flex-card">
                 <div class="form-card card" style="max-width: 800px !important;">
 
+                    <?php
+                    if (isset($_SESSION["login_sending_errors"]) && !empty($_SESSION["login_sending_errors"])) {
+                    ?>
+                        <div class="alert alert-danger" role="alert">
+                            <h5 class="alert-heading">Errors While Sending Application Login Details!</h5>
+                            <hr>
+                            <ol>
+                                <?php
+                                if (isset($_SESSION["login_sending_errors"]["sms"])) {
+                                ?>
+                                    <li><?= $_SESSION["login_sending_errors"]["sms"] ?></li>
+                                <?php
+                                }
+                                ?>
+                                <?php
+                                if (isset($_SESSION["login_sending_errors"]["email"])) {
+                                ?>
+                                    <li><?= $_SESSION["login_sending_errors"]["email"] ?></li>
+                                <?php
+                                }
+                                ?>
+                            </ol>
+                        </div>
+                    <?php
+                    } else {
+                    ?>
+                        <div class="alert alert-success" role="alert">
+                            <p>Applicant login details successfully sent via email and SMS</p>
+                        </div>
+                    <?php
+                    }
+                    ?>
+
                     <div class="purchase-card-header flex-row">
                         <h1>Applicant Receipt</h1>
                         <b><span class="bi bi-x-lg me-5 text-danger" style="cursor: pointer;" onclick="window.location.href = 'sell.php'"></span></b>
