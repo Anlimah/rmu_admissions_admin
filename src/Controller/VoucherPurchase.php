@@ -180,7 +180,7 @@ class VoucherPurchase
             $purchase_id = $this->saveVendorPurchaseData($trans_id, $vd, $fi, $ap_id, $pm, $am, $fn, $ln, $em, $cn, $cc, $pn);
             if ($purchase_id) {
                 if ($pm == "CASH") {
-                    $send_email_sms = $data["ref_number"] ? true : false;
+                    $send_email_sms = isset($data["ref_number"]) ? true : false;
                     if ($send_email_sms) $_SESSION["is_international"] = true;
                     return $this->genLoginsAndSend($purchase_id, $send_email_sms);
                 } else {
