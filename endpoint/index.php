@@ -282,10 +282,29 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
             if (!isset($_POST["ref_number"]) || empty($_POST["ref_number"])) {
                 die(json_encode(array("success" => false, "message" => "Reference Number is required!")));
             }
+            if (!isset($_POST["amount"]) || empty($_POST["amount"])) {
+                die(json_encode(array("success" => false, "message" => "Amount Paid is required!")));
+            }
 
             $ref_number = $expose->validateText($_POST["ref_number"]);
+            $amount_paid = $expose->validateNumber($_POST["amount"]);
             $result = $admin->verifyInternationalApplicantRefNumber($ref_number);
             if (empty($result)) die(json_encode(array("success" => false, "message" => "No match found for provided reference number!")));
+
+            $masters_form_price = (int) getenv('INT_MASTER_FORMS_PRICE');
+            $others_form_price = (int) getenv('INT_OTHER_FORMS_PRICE');
+
+            if ($result[0]["form"] == 1 && $amount_paid < $masters_form_price) {
+                die(json_encode(array(
+                    "success" => false,
+                    "message" => "The amount paid by the applicant is less than price of {$result[0]['name']} (USD{$masters_form_price}) form!"
+                )));
+            } else if ($result[0]["form"] >= 2 && $amount_paid < $others_form_price) {
+                die(json_encode(array(
+                    "success" => false,
+                    "message" => "The amount paid by the applicant is less than price of {$result[0]['name']}  (USD{$others_form_price}) form!"
+                )));
+            }
 
             if (isset($result[0]["app_number"]) && !empty($result[0]["app_number"])) {
                 $data = $admin->fetchForeignAppDetailsAppNumber($result[0]["app_number"]);
@@ -303,7 +322,9 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
                     "amount" => $result[0]["amount"],
                     "vendor_id" => $_SESSION["vendor_id"],
                     "admin_period" => $_SESSION["admin_period"],
-                    "ref_number" => $ref_number
+                    "ref_number" => $ref_number,
+                    "is_international" => true,
+                    "amount_paid" => $result[0]["form"] == 1 ? 'USD ' . $masters_form_price : 'USD ' . $others_form_price
                 );
 
                 if (!$expose->vendorExist($_SESSION["vendorData"]["vendor_id"])) {

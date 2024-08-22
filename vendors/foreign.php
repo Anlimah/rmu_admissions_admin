@@ -188,7 +188,12 @@ require_once('../inc/page-data.php');
                                 <div class="flex-column" style="padding:10px 30px">
                                     <div class="row mb-4">
                                         <div class="col">
+                                            <label for="ref_number" class="form-label">Payment Reference Number</label>
                                             <input name="ref_number" id="ref_number" style="text-align:center" class="form-control" type="text" placeholder="Enter reference number" required>
+                                        </div>
+                                        <div class="col">
+                                            <label for="amount" class="form-label">Amount Paid (USD)</label>
+                                            <input name="amount" id="amount" style="text-align:center" class="form-control" type="text" placeholder="Enter Amount Oaid" required>
                                         </div>
                                     </div>
                                     <div class="flex-row justify-content-center">
@@ -289,7 +294,7 @@ require_once('../inc/page-data.php');
                 setTimeout(() => {
                     flashMessage.style.visibility = "visible";
                     flashMessage.classList.add("show");
-                }, 5000);
+                }, 1000);
 
                 setTimeout(() => {
                     flashMessage.classList.remove("show");

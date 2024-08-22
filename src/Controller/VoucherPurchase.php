@@ -181,6 +181,7 @@ class VoucherPurchase
             if ($purchase_id) {
                 if ($pm == "CASH") {
                     $send_email_sms = $data["ref_number"] ? true : false;
+                    if ($send_email_sms) $_SESSION["is_international"] = true;
                     return $this->genLoginsAndSend($purchase_id, $send_email_sms);
                 } else {
                     return array("success" => true, "message" => "Save purchase data!");
