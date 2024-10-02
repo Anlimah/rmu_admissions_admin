@@ -190,8 +190,11 @@ $adminSetup = true;
 
                             $data = array(
                                 "admission-period" => $currentAdminPeriod,
-                                "from-date" => "", "to-date" => "", "form-type" => "all",
-                                "purchase-status" => "all", "vendor-id" => $vendor_id
+                                "from-date" => "",
+                                "to-date" => "",
+                                "form-type" => "all",
+                                "purchase-status" => "all",
+                                "vendor-id" => $vendor_id
                             );
                             $purchaseData = $admin->fetchAllVendorFormPurchases($_SESSION["admin_period"], $data);
                             $totalPurchaseData = !empty($purchaseData) ? count($purchaseData) : 0;

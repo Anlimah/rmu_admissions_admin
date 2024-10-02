@@ -1,0 +1,42 @@
+
+<!--              sidebar 
+             <li class="nav-item">
+                <a class="nav-link  <?= $pageTitle === "Quizzes" ? "" : "collapsed" ?>" href="quizzes.php">
+                    <i class="bi bi-person"></i>
+                    <span>Quiz</span>
+                </a>
+            </li> 
+              <li class="nav-item">
+                <a class="nav-link  <?= $pageTitle === "Questions" ? "" : "collapsed" ?>" href="questions.php?fk_course=<?= $class["fk_course"] ?>">
+                    <i class="bi bi-person"></i>
+                    <span>Questions</span>
+                </a>
+            </li>   <li class="nav-item">
+                <a class="nav-link  <?= $pageTitle === "Assesment" ? "" : "collapsed" ?>" href="assesment.php">
+                    <i class="bi bi-person"></i>
+                    <span>Assesment</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link  <?= $pageTitle === "Classes" ? "" : "collapsed" ?>" href="class.php">
+                    <i class="bi bi-person"></i>
+                    <span>Classes</span>
+                </a>
+            </li>-->
+            <!-- End Profile Page Nav -->
+
+              <!--    <li class="nav-item">
+          <a class="nav-link  <?= $pageTitle === "Courses" ? "" : "collapsed" ?>" href="answers.php">
+                    <i class="bi bi-person"></i>
+                    <span>Answers</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link  <?= $pageTitle === "Courses" ? "" : "collapsed" ?>" href="course.php">
+                    <i class="bi bi-person"></i>
+                    <span>Courses</span>
+                </a>
+            </li> -->
+            
+            <!-- End Profile Page Nav -->
