@@ -3,10 +3,8 @@ session_start();
 
 if (!isset($_SESSION["lastAccessed"])) $_SESSION["lastAccessed"] = time();
 $_SESSION["currentAccess"] = time();
-
 $diff = $_SESSION["currentAccess"] - $_SESSION["lastAccessed"];
-
-if ($diff >  1800) die(json_encode(array("success" => false, "message" => "Your session expired. Please refresh the page to continue!")));
+if ($diff > 1800) die(json_encode(array("success" => false, "message" => "logout")));
 
 /*
 * Designed and programmed by
@@ -275,6 +273,90 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
     }
 
+    // International student ref number verification
+    elseif ($_GET["url"] == "ref-number-verify") {
+
+        if (!$expose->vendorExist($_SESSION["vendor_id"])) {
+            die(json_encode(array("success" => false, "message" => "Process can only be performed by a vendor!")));
+        }
+
+        if (isset($_SESSION["_foreignFormToken"]) && !empty($_SESSION["_foreignFormToken"]) && isset($_POST["_FFToken"]) && !empty($_POST["_FFToken"]) && $_POST["_FFToken"] == $_SESSION["_foreignFormToken"]) {
+
+            if (!isset($_POST["action"]) || empty($_POST["action"])) {
+                die(json_encode(array("success" => false, "message" => "Action parameter is required!")));
+            }
+
+            if (!isset($_POST["ref-number"]) || empty($_POST["ref-number"])) {
+                die(json_encode(array("success" => false, "message" => "Reference Number is required!")));
+            }
+
+            if (!isset($_POST["membership"]) || empty($_POST["membership"])) {
+                die(json_encode(array("success" => false, "message" => "Membership is required!")));
+            }
+
+            switch ($_POST["action"]) {
+                case 'approve':
+                    $ref_number = $expose->validateText($_POST["ref-number"]);
+                    $membership = $expose->validateText($_POST["membership"]);
+
+                    $result = $admin->verifyInternationalApplicantRefNumber($ref_number);
+                    if (empty($result)) die(json_encode(array("success" => false, "message" => "No match found for provided reference number!")));
+
+                    // Ensure amount and rate are valid floats
+                    $amount = floatval($result[0]['amount']);
+                    $rate = floatval($result[0]['rate']);
+
+                    $form_price = $amount * $rate;
+
+                    if (isset($result[0]["app_number"]) && !empty($result[0]["app_number"])) {
+                        $data = $admin->fetchForeignAppDetailsAppNumber($result[0]["app_number"]);
+                        die(json_encode(array("success" => true, "exttrid" => $data[0]["id"], "message" => "Transaction succeeded!")));
+                    } else {
+                        $_SESSION["vendorData"] = array(
+                            "first_name" => $result[0]["first_name"],
+                            "last_name" => $result[0]["last_name"],
+                            "country_name" => $result[0]["p_country_name"],
+                            "country_code" => $result[0]["p_country_code"],
+                            "phone_number" => $result[0]["phone_number"],
+                            "email_address" => $result[0]["email_address"],
+                            "form_id" => $result[0]["form"],
+                            "pay_method" => "CASH",
+                            "amount" => $form_price,
+                            "vendor_id" => $_SESSION["vendor_id"],
+                            "admin_period" => $_SESSION["admin_period"],
+                            "ref_number" => $ref_number,
+                            "is_international" => true,
+                            "amount_paid" => 'USD ' . $amount
+                        );
+
+                        $res = $admin->processVendorPay($_SESSION["vendorData"]);
+
+                        if (!empty($res) && isset($res['success']) && $res["success"] == true && isset($res["exttrid"]) && !empty($res["exttrid"])) {
+                            $admin->updateForiegnPurchaseStatus($ref_number, 'approved', $res["app_number"]);
+                            unset($res["app_number"]);
+                        }
+
+                        die(json_encode($res));
+                    }
+                    break;
+
+                case 'decline':
+                    $ref_number = $expose->validateText($_POST["ref-number"]);
+                    $res = $admin->updateForiegnPurchaseStatus($ref_number, 'declined');
+                    if ($res) die(json_encode(array("success" => true, "message" => "Request declined successfully!")));
+                    break;
+
+                default:
+                    die(json_encode(array("success" => false, "message" => "Action unavailable!")));
+                    break;
+            }
+
+            die(json_encode(array("success" => false, "message" => "Action unavailable!")));
+        } else {
+            die(json_encode(array("success" => false, "message" => "Invalid request!")));
+        }
+    }
+
     //
     elseif ($_GET["url"] == "apps-data") {
         if (!isset($_POST["action"]) || !isset($_POST["form_t"])) die(json_encode(array("success" => false, "message" => "Invalid input!")));
@@ -516,9 +598,17 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
 
         $user_data = array(
-            "first_name" => $_POST["v-name"], "last_name" => "MAIN", "user_name" => $_POST["v-email"], "user_role" => "Vendors",
-            "user_type" => "user", "vendor_company" => $_POST["v-name"], "company_code" => $_POST["v-code"], "vendor_role" => "Ops Head",
-            "vendor_phone" => $_POST["v-phone"], "vendor_branch" => "MAIN", "api_user" => ($_POST["v-api-user"] == "YES" ? 1 : 0)
+            "first_name" => $_POST["v-name"],
+            "last_name" => "MAIN",
+            "user_name" => $_POST["v-email"],
+            "user_role" => "Vendors",
+            "user_type" => "user",
+            "vendor_company" => $_POST["v-name"],
+            "company_code" => $_POST["v-code"],
+            "vendor_role" => "Ops Head",
+            "vendor_phone" => $_POST["v-phone"],
+            "vendor_branch" => "MAIN",
+            "api_user" => ($_POST["v-api-user"] == "YES" ? 1 : 0)
         );
 
         $privileges = array("select" => 1, "insert" => 1, "update" => 0, "delete" => 0);
@@ -668,10 +758,14 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         }
 
         $user_data = array(
-            "first_name" => $_POST["user-fname"], "last_name" => $_POST["user-lname"],
-            "user_name" => $_POST["user-email"], "user_role" => $_POST["user-role"],
-            "user_type" => $_POST["user-type"], "vendor_company" => $_POST["vendor-company"],
-            "vendor_tin" => $_POST["vendor-tin"], "vendor_phone" => $_POST["vendor-phone"],
+            "first_name" => $_POST["user-fname"],
+            "last_name" => $_POST["user-lname"],
+            "user_name" => $_POST["user-email"],
+            "user_role" => $_POST["user-role"],
+            "user_type" => $_POST["user-type"],
+            "vendor_company" => $_POST["vendor-company"],
+            "vendor_tin" => $_POST["vendor-tin"],
+            "vendor_phone" => $_POST["vendor-phone"],
             "vendor_address" => $_POST["vendor-address"]
         );
 
@@ -893,13 +987,16 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         if (!isset($_POST["app-stream-check"]) || empty($_POST["app-stream-check"]))
             die(json_encode(array("success" => false, "message" => "No stream provide for this applicant!")));
 
+        if (!isset($_POST["app-level-admit-check"]) || empty($_POST["app-level-admit-check"]))
+            die(json_encode(array("success" => false, "message" => "No stream provide for this applicant!")));
+
         if (!isset($_POST["app-email-check"]))
             die(json_encode(array("success" => false, "message" => "Choose an option to send email to applicant or not!")));
 
         if (!isset($_POST["app-sms-check"]))
             die(json_encode(array("success" => false, "message" => "Choose an option to send SMS to applicant or not!")));
 
-        die(json_encode($admin->admitIndividualApplicant($_POST["app-login-check"], $_POST["app-prog-id-check"], $_POST["app-stream-check"], $_POST["app-email-check"], $_POST["app-sms-check"])));
+        die(json_encode($admin->admitIndividualApplicant($_POST["app-login-check"], $_POST["app-prog-id-check"], $_POST["app-stream-check"], $_POST["app-level-admit-check"], $_POST["app-email-check"], $_POST["app-sms-check"])));
     }
 
     // decline applicant admission
@@ -926,7 +1023,21 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
             die(json_encode(array("success" => false, "message" => "There no match for this applicant in database!")));
         if (!isset($_POST["app-prog"]) || empty($_POST["app-prog"]))
             die(json_encode(array("success" => false, "message" => "Please choose a programme!")));
-        die(json_encode($admin->enrollApplicant($_POST["app-login"], $_POST["app-prog"])));
+        if (!isset($_POST["app-level"]) || empty($_POST["app-level"]))
+            die(json_encode(array("success" => false, "message" => "Please choose a level!")));
+        if (!isset($_POST["app-duration"]) || empty($_POST["app-duration"]))
+            die(json_encode(array("success" => false, "message" => "Please choose a level!")));
+        die(json_encode($admin->enrollApplicant($_POST["app-login"], $_POST["app-prog"], $_POST["app-level"], $_POST["app-duration"])));
+    }
+
+    // Set student's class and courses
+    elseif ($_GET["url"] == "set-student-courses") {
+        if (!isset($_POST["class"]) || empty($_POST["class"]))
+            die(json_encode(array("success" => false, "message" => "Missing parameter in request: class code!")));
+        if (!isset($_POST["program"]) || empty($_POST["program"]))
+            die(json_encode(array("success" => false, "message" => "Missing parameter in request: program id!")));
+
+        die(json_encode($admin->setStudentCourses($_POST["class"], $_POST["program"])));
     }
 
     //
