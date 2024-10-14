@@ -3088,4 +3088,12 @@ class AdminController
         $query = "SELECT COUNT(`id`) AS total FROM `foreign_form_purchase_requests` WHERE `status` = :s";
         return $this->dm->getData($query, array(":s" => $status));
     }
+
+    public function unsubmitApplication($app_id)
+    {
+        $query = "UPDATE `form_sections_chek` SET `declaration` = 0 WHERE `app_login` = :i";
+        if ($this->dm->getData($query, array(":i" => $app_id)))
+            return array("success" => true, "message" => "Applicant form has been unsubmitted!");
+        return array("success" => false, "message" => "Failed to unsubmit applicant form!");
+    }
 }

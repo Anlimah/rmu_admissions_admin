@@ -266,9 +266,10 @@ require_once('../inc/page-data.php');
                                     '<td>' + (declared ? '<span class="badge text-bg-success">Submitted</span></td>' : '<span class="badge text-bg-danger">In Progress</span></td>') +
                                     '<td>' + (value.printed == "1" ? '<span class="bi bi-check-lg text-success"></span>' : '<span class="bi bi-x-lg text-danger"></span> <input type="checkbox" id="' + value.id + '" class="checkPrintedDoc">') +
                                     '</td>' +
-                                    '<td>' + (declared ? '<b><a href="applicant-info.php?t=' + getUrlVars()["t"] + '&c=' + getUrlVars()["c"] + '&q=' + value.id + '">Open</a></b></td>' : '') +
-                                    '</tr>'
-                                );
+                                    '<td>' +
+                                    (declared ? '<span><b><a class="btn btn-xs btn-primary" href="applicant-info.php?t=' + getUrlVars()["t"] + '&c=' + getUrlVars()["c"] + '&q=' + value.id + '">Open</a></b></span> <span class="btn btn-xs btn-danger unsubmit-btn" id="' + value.id + '">Unsubmit</span>' : '') +
+                                    '</td>' +
+                                    '</tr>');
                             });
                             $("#info-output").hide();
 
@@ -449,7 +450,29 @@ require_once('../inc/page-data.php');
                 });
             });
 
+            $(document).on("click", ".unsubmit-btn", function() {
 
+                if (!confirm("Are you sure you want to unsubmit this application?")) {
+                    return;
+                }
+
+                data = {
+                    "app": $(this).attr("id")
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: "../endpoint/unsubmit-application",
+                    data: data,
+                    success: function(result) {
+                        console.log(result);
+                        if (result.message == "logout") window.location.href = "?logout=true";
+                    },
+                    error: function(error) {
+                        console.log(error);
+                    }
+                });
+            });
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@2.1.7/dist/loadingoverlay.min.js"></script>

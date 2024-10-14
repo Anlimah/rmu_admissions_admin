@@ -1064,6 +1064,12 @@ if ($_SERVER['REQUEST_METHOD'] == "GET") {
         die(json_encode($admin->generateAPIKeys($_SESSION["vendor_id"])));
     }
 
+    // Unsubmit application
+    else if ($_GET["url"] == "unsubmit-application") {
+        if (!isset($_POST["app"]) || empty($_POST["app"]))
+            die(json_encode(array("success" => false, "message" => "Invalid request received!")));
+        die(json_encode($admin->unsubmitApplication($_POST["app"])));
+    }
     // All PUT request will be sent here
 } else if ($_SERVER['REQUEST_METHOD'] == "PUT") {
     parse_str(file_get_contents("php://input"), $_PUT);
