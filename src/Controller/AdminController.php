@@ -3095,5 +3095,5 @@ class AdminController
         if ($this->dm->getData($query, array(":i" => $app_id)))
             return array("success" => true, "message" => "Applicant form has been unsubmitted!");
         return array("success" => false, "message" => "Failed to unsubmit applicant form!");
-    }
+    } 
 }
