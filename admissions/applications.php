@@ -466,6 +466,7 @@ require_once('../inc/page-data.php');
                     data: data,
                     success: function(result) {
                         console.log(result);
+                        alert(result.message);
                         if (result.message == "logout") window.location.href = "?logout=true";
                     },
                     error: function(error) {

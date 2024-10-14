@@ -3089,11 +3089,25 @@ class AdminController
         return $this->dm->getData($query, array(":s" => $status));
     }
 
-    public function unsubmitApplication($app_id)
+    public function unsubmitApplication($appID)
     {
         $query = "UPDATE `form_sections_chek` SET `declaration` = 0 WHERE `app_login` = :i";
-        if ($this->dm->getData($query, array(":i" => $app_id)))
-            return array("success" => true, "message" => "Applicant form has been unsubmitted!");
+        if ($this->dm->getData($query, array(":i" => $appID))) {
+
+            $contactInfo = $this->getApplicantContactInfo($appID);
+            // Prepare SMS message
+            $message = 'Hi ' . ucfirst(strtolower($contactInfo[0]["first_name"])) . " " . ucfirst(strtolower($contactInfo[0]["last_name"])) . '. ';
+            $message .= 'Your application to Regional Maritime University has been unsubmitted for you provide missing details of your application. ';
+            $message .= 'Kindly visit the application portal at https://admissions.rmuictonline.com to complete your application. Thank you';
+            $to = $contactInfo[0]["phone_no1_code"] . $contactInfo[0]["phone_no1"];
+            $smsSent = false;
+
+            // Send SMS message
+            $response = json_decode($this->expose->sendSMS($to, $message));
+            if (!$response->status) $smsSent = true;
+            if ($smsSent) return array("success" => true, "message" => "Application form has been unsubmitted successfully and SMS notification sent to applicant!");
+            else return array("success" => true, "message" => "Application form has been unsubmitted successfully but SMS notification failed!");
+        }
         return array("success" => false, "message" => "Failed to unsubmit applicant form!");
-    } 
+    }
 }
